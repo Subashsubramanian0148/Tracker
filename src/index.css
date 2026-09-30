@@ -182,3 +182,6 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* letter spacing is always 0 */
+*, *::before, *::after { letter-spacing: 0px !important; }
