@@ -1,0 +1,47 @@
+# Build context is the repository root. Keep it minimal: only manifests and source reach the builder.
+
+# Dependencies and build output (rebuilt inside the image)
+**/node_modules
+**/dist
+**/coverage
+**/.turbo
+**/*.tsbuildinfo
+**/.vite
+apps/api/src/generated
+
+# VCS, CI and tooling
+.git
+.gitignore
+.gitattributes
+.github
+.vscode
+.idea
+**/.DS_Store
+**/*.log
+**/npm-debug.log*
+
+# Secrets and local environment - never part of an image
+.env
+.env.*
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.pfx
+**/*.p12
+
+# Deployment, infrastructure and documentation
+Dockerfile
+.dockerignore
+docker-compose*.yml
+compose*.yml
+infra
+scripts
+docs
+**/*.md
+
+# Security tooling output
+zap-report.*
+**/*.sarif
+trivy-*
+sbom*.json

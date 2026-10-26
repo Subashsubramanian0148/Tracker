@@ -1,0 +1,181 @@
+# Continuous delivery template: build once, promote the same digest staging -> production.
+#
+# Disabled until the repository variable DEPLOY_ENABLED is "true" (docs/DEPLOYMENT.md, "CI/CD").
+#   - Azure auth: GitHub OIDC -> user-assigned managed identity with a federated credential. No secrets.
+#   - Images are pushed to GHCR, then imported server-side into each environment's private ACR
+#     (`az acr import`), so GitHub-hosted runners never need network access to the VNet.
+#   - Migrations run as a Container Apps Job before the new revision is rolled out.
+#   - Smoke tests need line of sight to the internal app and therefore run on a self-hosted runner
+#     inside the VNet (enabled with SMOKE_TEST_ENABLED=true).
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environments to deploy
+        type: choice
+        options:
+          - staging
+          - staging-then-production
+        default: staging
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+# Never cancel a deployment half-way; queue the next one instead.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and publish images
+    if: vars.DEPLOY_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || vars.DEPLOY_ON_TAG == 'true')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      runtime-image: ${{ steps.refs.outputs.runtime }}
+      migrator-image: ${{ steps.refs.outputs.migrator }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Image names
+        id: names
+        run: |
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          {
+            echo "runtime=${repo}/runtime"
+            echo "migrator=${repo}/migrator"
+            echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push runtime
+        id: runtime
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: runtime
+          platforms: linux/amd64
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: |
+            ${{ steps.names.outputs.runtime }}:${{ github.sha }}
+            ${{ startsWith(github.ref, 'refs/tags/') && format('{0}:{1}', steps.names.outputs.runtime, github.ref_name) || '' }}
+          build-args: |
+            VCS_REF=${{ github.sha }}
+            BUILD_DATE=${{ steps.names.outputs.created }}
+            VERSION=${{ github.ref_name }}
+          cache-from: type=gha,scope=runtime
+
+      - name: Build and push migrator
+        id: migrator
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: migrator
+          platforms: linux/amd64
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ${{ steps.names.outputs.migrator }}:${{ github.sha }}
+          build-args: |
+            VCS_REF=${{ github.sha }}
+            BUILD_DATE=${{ steps.names.outputs.created }}
+            VERSION=${{ github.ref_name }}
+          cache-from: type=gha,scope=migrator
+
+      - name: Image references (by digest)
+        id: refs
+        env:
+          RUNTIME_REPO: ${{ steps.names.outputs.runtime }}
+          RUNTIME_DIGEST: ${{ steps.runtime.outputs.digest }}
+          MIGRATOR_REPO: ${{ steps.names.outputs.migrator }}
+          MIGRATOR_DIGEST: ${{ steps.migrator.outputs.digest }}
+        run: |
+          echo "runtime=${RUNTIME_REPO}@${RUNTIME_DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "migrator=${MIGRATOR_REPO}@${MIGRATOR_DIGEST}" >> "$GITHUB_OUTPUT"
+
+      # Re-scan the exact artifact being released (the vulnerability DB may have changed since CI).
+      - name: Trivy gate - runtime
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          image-ref: ${{ steps.refs.outputs.runtime }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Trivy gate - migrator
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          image-ref: ${{ steps.refs.outputs.migrator }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          skip-setup-trivy: true
+
+      - name: Attest build provenance - runtime
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.names.outputs.runtime }}
+          subject-digest: ${{ steps.runtime.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest build provenance - migrator
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.names.outputs.migrator }}
+          subject-digest: ${{ steps.migrator.outputs.digest }}
+          push-to-registry: true
+
+  staging:
+    name: Staging
+    needs: [build]
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: staging
+      runtime-image: ${{ needs.build.outputs.runtime-image }}
+      migrator-image: ${{ needs.build.outputs.migrator-image }}
+
+  production:
+    name: Production
+    needs: [build, staging]
+    if: github.event_name == 'push' || inputs.target == 'staging-then-production'
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: production
+      runtime-image: ${{ needs.build.outputs.runtime-image }}
+      migrator-image: ${{ needs.build.outputs.migrator-image }}

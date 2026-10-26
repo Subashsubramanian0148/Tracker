@@ -1,0 +1,104 @@
+# Reusable: release one environment. Called by deploy.yml; not triggered directly.
+#
+# Required GitHub *environment* variables (values come from the Bicep output githubEnvironmentVariables):
+#   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP,
+#   ACR_NAME, CONTAINER_APP_NAME, MIGRATION_JOB_NAME
+# Optional repository variable: SMOKE_TEST_ENABLED=true (needs a runner labelled [self-hosted, vnet]).
+
+name: Deploy environment
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      runtime-image:
+        description: ghcr.io/...runtime@sha256:...
+        type: string
+        required: true
+      migrator-image:
+        description: ghcr.io/...migrator@sha256:...
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Release (${{ inputs.environment }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ steps.deploy.outputs.url }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      ACR_NAME: ${{ vars.ACR_NAME }}
+      CONTAINER_APP_NAME: ${{ vars.CONTAINER_APP_NAME }}
+      MIGRATION_JOB_NAME: ${{ vars.MIGRATION_JOB_NAME }}
+      SOURCE_RUNTIME_IMAGE: ${{ inputs.runtime-image }}
+      SOURCE_MIGRATOR_IMAGE: ${{ inputs.migrator-image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Azure login (OIDC)
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure CLI extensions
+        run: az extension add --name containerapp --upgrade --only-show-errors
+
+      - name: Import images into ACR
+        id: import
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          runtime=$(scripts/deploy/import-image.sh "$ACR_NAME" "$SOURCE_RUNTIME_IMAGE" ado-metrics/runtime "$GITHUB_SHA")
+          migrator=$(scripts/deploy/import-image.sh "$ACR_NAME" "$SOURCE_MIGRATOR_IMAGE" ado-metrics/migrator "$GITHUB_SHA")
+          echo "runtime=$runtime" >> "$GITHUB_OUTPUT"
+          echo "migrator=$migrator" >> "$GITHUB_OUTPUT"
+
+      - name: Run database migrations
+        env:
+          MIGRATOR_IMAGE: ${{ steps.import.outputs.migrator }}
+        run: scripts/deploy/run-migration.sh "$RESOURCE_GROUP" "$MIGRATION_JOB_NAME" "$MIGRATOR_IMAGE"
+
+      - name: Roll out new revision
+        id: deploy
+        env:
+          RUNTIME_IMAGE: ${{ steps.import.outputs.runtime }}
+        run: |
+          suffix="${GITHUB_SHA::7}-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          scripts/deploy/deploy-revision.sh "$RESOURCE_GROUP" "$CONTAINER_APP_NAME" "$RUNTIME_IMAGE" "$suffix"
+
+  smoke:
+    name: Smoke test (${{ inputs.environment }})
+    needs: [release]
+    if: vars.SMOKE_TEST_ENABLED == 'true'
+    # The app is internal-only: GitHub-hosted runners cannot reach it.
+    runs-on: [self-hosted, vnet]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Smoke test
+        env:
+          APP_URL: ${{ needs.release.outputs.url }}
+        run: scripts/deploy/smoke-test.sh "$APP_URL"

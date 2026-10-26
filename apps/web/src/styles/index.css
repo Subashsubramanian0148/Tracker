@@ -1,0 +1,265 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/*
+ * Theme: DesignFlow coral, built on the tweakcn base (cmie97f2b000704l27r9g1p11). Raw shadcn-style variables live on :root / .dark;
+ * the app's own token names below point at them, so every existing class follows the theme.
+ */
+:root {
+  --background: #faf7f5;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --primary: #c8431e;
+  --primary-foreground: #fffaf7;
+  --secondary: #f1ece9;
+  --secondary-foreground: #222222;
+  --muted: #f7f3f1;
+  --muted-foreground: #57534e;
+  --accent: #fde4da;
+  --accent-foreground: #5c1d0b;
+  --destructive: #b42318;
+  --destructive-foreground: #fafafa;
+  --border: #ebe5e1;
+  --input: #f1ece9;
+  --ring: #e4572e;
+  --chart-1: #fde4da;
+  --chart-2: #f6a68c;
+  --chart-3: #e4572e;
+  --chart-4: #c8431e;
+  --chart-5: #7a2610;
+  --sidebar: #fbf8f6;
+  --sidebar-foreground: #171717;
+  --sidebar-primary: #c8431e;
+  --sidebar-primary-foreground: #fffaf7;
+  --sidebar-accent: #fde4da;
+  --sidebar-accent-foreground: #5c1d0b;
+  --sidebar-border: #ebe5e1;
+  --sidebar-ring: #e4572e;
+  --radius: 0.5rem;
+  --shadow-2xs: 0.25px 1px 3px 0px hsl(15 60% 20% / 0.07);
+  --shadow-xs: 0.25px 1px 3px 0px hsl(15 60% 20% / 0.07);
+  --shadow-sm:
+    0.25px 1px 3px 0px hsl(15 60% 20% / 0.15), 0.25px 1px 2px -1px hsl(15 60% 20% / 0.15);
+  --shadow: 0.25px 1px 3px 0px hsl(15 60% 20% / 0.15), 0.25px 1px 2px -1px hsl(15 60% 20% / 0.15);
+  --shadow-md:
+    0.25px 1px 3px 0px hsl(15 60% 20% / 0.15), 0.25px 2px 4px -1px hsl(15 60% 20% / 0.15);
+  --shadow-lg:
+    0.25px 1px 3px 0px hsl(15 60% 20% / 0.15), 0.25px 4px 6px -1px hsl(15 60% 20% / 0.15);
+  --shadow-xl:
+    0.25px 1px 3px 0px hsl(15 60% 20% / 0.15), 0.25px 8px 10px -1px hsl(15 60% 20% / 0.15);
+  --shadow-2xl: 0.25px 1px 3px 0px hsl(15 60% 20% / 0.38);
+}
+
+.dark {
+  --background: #000000;
+  --foreground: #ededed;
+  --card: #0a0a0a;
+  --card-foreground: #ededed;
+  --popover: #0a0a0a;
+  --popover-foreground: #ededed;
+  --secondary: #222222;
+  --secondary-foreground: #ebebeb;
+  --muted: #1d1d1d;
+  --muted-foreground: #a4a4a4;
+  --accent: #3a211a;
+  --accent-foreground: #fde4da;
+  --destructive: #ff5b5b;
+  --border: #242424;
+  --input: #333333;
+  --chart-1: #7a2610;
+  --chart-2: #c8431e;
+  --chart-4: #f6a68c;
+  --chart-5: #fde4da;
+  --sidebar: #000000;
+  --sidebar-foreground: #ededed;
+  --sidebar-accent: #3a211a;
+  --sidebar-accent-foreground: #fde4da;
+  --sidebar-border: #242424;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+/* shadcn tokens, standard names (bg-muted, hover:bg-accent, bg-card, …) used by components/shadcn. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+
+  /* App tokens, mapped onto the theme. */
+  --font-display: 'Geist Variable', Geist, ui-sans-serif, system-ui, sans-serif;
+  --font-number: 'DM Serif Display', Georgia, serif;
+  --font-sans: 'Geist Variable', Geist, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, monospace;
+
+  --color-canvas: var(--muted);
+  --color-surface: var(--card);
+  --color-sidebar: var(--sidebar);
+  --color-pill: var(--secondary);
+  --color-field: var(--input);
+  --color-tile: var(--muted);
+  --color-tile-hover: var(--secondary);
+  --color-ink: var(--foreground);
+  --color-ink-soft: var(--secondary-foreground);
+  --color-faint: #8a8a8a;
+  --color-line: var(--border);
+  --color-line-strong: #ddd5d0;
+
+  --color-brand-bright: var(--chart-3);
+  --color-brand-soft: var(--accent);
+  --color-danger: var(--destructive);
+
+  --radius-frame: calc(var(--radius) + 8px);
+  --radius-panel: calc(var(--radius) + 4px);
+  --radius-card: var(--radius);
+
+  --shadow-frame: var(--shadow-md);
+  --shadow-soft: var(--shadow-sm);
+  --shadow-pop: var(--shadow-lg);
+}
+
+@theme {
+  --color-warn: #d97706;
+  --color-warn-strong: #b45309;
+  --color-warn-soft: #fff7e6;
+  --color-danger-soft: #fef3f2;
+  --color-success: #067647;
+  --color-success-soft: #ecfdf3;
+  --color-amber-ink: #8a4b00;
+  --color-amber-soft: #fff6db;
+
+  --color-col-todo: #a8a29e;
+  --color-col-progress: #2a78d6;
+  --color-col-resolved: #8b5cf6;
+  --color-col-done: #14b8a6;
+  --color-col-removed: #a3a3a3;
+
+  /* Chart series (validated categorical palette, fixed order). */
+  --color-series-1: #c8431e;
+  --color-series-2: #2a78d6;
+  --color-series-3: #1baf7a;
+
+  --shadow-cta: 0 6px 16px -6px rgb(92 29 11 / 0.35);
+
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-toast-in: toast-in 200ms ease-out;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--color-brand-soft);
+  }
+}
+
+/* Gradient-border pill (e.g. "Sync now", due pills): border painted by a padded wrapper. */
+@utility gradient-ring {
+  background-image: linear-gradient(90deg, #f6a68c, #e4572e 50%, #c8431e);
+}
+@utility gradient-ring-due {
+  background-image: linear-gradient(90deg, #f6a68c, #e4572e);
+}
+@utility gradient-ring-user {
+  background-image: linear-gradient(90deg, #f6a68c, #e4572e);
+}
+@utility gradient-wash {
+  background-image: linear-gradient(135deg, #fde4da 0%, #f6a68c 60%, #e4572e 100%);
+}
+@utility dark-sheen {
+  background-image: linear-gradient(180deg, #2a2a2a 0%, #111111 55%, #050505 100%);
+}
+
+@layer base {
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Unlayered so it beats font-semibold: DM Serif ships one weight, so skip the smeared fake bold. */
+.font-number {
+  font-weight: 400;
+  letter-spacing: 0;
+}

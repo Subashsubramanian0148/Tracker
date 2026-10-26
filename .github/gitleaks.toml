@@ -1,0 +1,18 @@
+# gitleaks configuration: the upstream default rule set plus a narrow allowlist.
+# Never allowlist a real secret - rotate it and rewrite history instead.
+
+title = "ado-metrics"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Lockfile integrity hashes"
+paths = ['''(^|/)package-lock\.json$''']
+
+[[allowlists]]
+description = "Documented placeholders and the non-functional build-time database URL"
+regexes = [
+  '''<REPLACE:[^>]*>''',
+  '''postgresql://(build:build|ci:ci)@localhost:5432/''',
+]

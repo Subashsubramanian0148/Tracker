@@ -1,0 +1,64 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": { "value": "adom" },
+    "environmentName": { "value": "prod" },
+    "owner": { "value": "<REPLACE: platform-team@contoso.com>" },
+    "extraTags": { "value": { "costCenter": "<REPLACE: cost center>" } },
+
+    "deployApp": { "value": false },
+
+    "vnetAddressPrefix": { "value": "10.60.0.0/22" },
+    "containerAppsSubnetPrefix": { "value": "10.60.0.0/23" },
+    "privateEndpointSubnetPrefix": { "value": "10.60.2.0/27" },
+    "postgresSubnetPrefix": { "value": "10.60.2.32/28" },
+    "toolsSubnetPrefix": { "value": "10.60.3.0/27" },
+    "dnsZoneLinkVnetIds": {
+      "value": ["<REPLACE: /subscriptions/<sub>/resourceGroups/<hub-rg>/providers/Microsoft.Network/virtualNetworks/<hub-vnet>, or remove>"]
+    },
+    "dnsServers": { "value": [] },
+    "postgresAdditionalSourcePrefixes": { "value": [] },
+    "allowedIngressCidrs": { "value": [] },
+
+    "logRetentionInDays": { "value": 730 },
+    "alertEmailAddresses": { "value": ["<REPLACE: ops@contoso.com>"] },
+
+    "keyVaultAllowedIpRanges": { "value": [] },
+    "keyVaultSecretsOfficerPrincipalIds": { "value": ["<REPLACE: object ID of the group that seeds/rotates secrets>"] },
+
+    "postgresAdminLogin": { "value": "pgadmin" },
+    "postgresEntraAdminObjectId": { "value": "<REPLACE: object ID of the DBA Entra group>" },
+    "postgresEntraAdminName": { "value": "<REPLACE: display name of the DBA Entra group>" },
+    "postgresSkuName": { "value": "Standard_B2ms" },
+    "postgresSkuTier": { "value": "Burstable" },
+    "postgresHighAvailability": { "value": false },
+    "postgresStorageSizeGB": { "value": 32 },
+    "pgauditLogClasses": { "value": "" },
+
+    "changeQueueKind": { "value": "servicebus" },
+    "serviceHookAuthMode": { "value": "sharedKey" },
+    "serviceHookSenderPrincipalId": { "value": "" },
+    "serviceBusSku": { "value": "Standard" },
+
+    "runtimeImage": { "value": "" },
+    "migratorImage": { "value": "" },
+    "publicBaseUrl": { "value": "https://metrics.contoso.internal" },
+    "entraClientId": { "value": "<REPLACE: application (client) ID of the Entra app registration>" },
+    "adoOrgUrl": { "value": "https://dev.azure.com/<REPLACE: organization>" },
+    "adoProjects": { "value": "" },
+    "logLevel": { "value": "info" },
+    "syncIntervalMinutes": { "value": 15 },
+    "dataRetentionDays": { "value": 730 },
+    "webhookBasicUser": { "value": "ado-service-hook" },
+    "minReplicas": { "value": 1 },
+    "maxReplicas": { "value": 3 },
+    "customDomainName": { "value": "metrics.contoso.internal" },
+    "customDomainCertificateName": { "value": "<REPLACE: Key Vault certificate name, or empty string to use the default FQDN>" },
+
+    "enableFrontDoor": { "value": false },
+
+    "githubRepository": { "value": "<REPLACE: github-org/ado-metrics>" },
+    "githubEnvironment": { "value": "production" }
+  }
+}

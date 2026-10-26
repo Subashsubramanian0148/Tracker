@@ -1,0 +1,39 @@
+{
+  "name": "ado-metrics",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Delivery metrics for Azure DevOps: cycle time, scope change, sprint health and delay reasons.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @ado-metrics/shared && npm run build -w @ado-metrics/api && npm run build -w @ado-metrics/web",
+    "dev:api": "npm run dev -w @ado-metrics/api",
+    "dev:web": "npm run dev -w @ado-metrics/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
+    "start:local": "node --env-file=.env apps/api/dist/main.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "eslint-plugin-security": "^4.2.0",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.0"
+  },
+  "overrides": {
+    "prisma": "7.10.1",
+    "multer": "^2.5.0",
+    "body-parser": "^2.4.0"
+  }
+}

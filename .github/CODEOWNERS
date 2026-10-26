@@ -1,0 +1,29 @@
+# Code owners. Replace the placeholder team handles with real GitHub teams, then enable
+# "Require review from Code Owners" in the main branch ruleset.
+# Later rules take precedence over earlier ones.
+
+# Default: application maintainers
+*                               @contoso/ado-metrics-maintainers
+
+# Backend and shared API contract
+/apps/api/                      @contoso/ado-metrics-backend
+/packages/shared/               @contoso/ado-metrics-backend @contoso/ado-metrics-frontend
+/apps/api/prisma/               @contoso/ado-metrics-backend @contoso/dba
+
+# Frontend
+/apps/web/                      @contoso/ado-metrics-frontend
+
+# Dependencies: lockfile changes need a maintainer
+/package.json                   @contoso/ado-metrics-maintainers
+/package-lock.json              @contoso/ado-metrics-maintainers
+
+# Platform, delivery and security controls: platform + security review required
+/Dockerfile                     @contoso/platform-engineering
+/.dockerignore                  @contoso/platform-engineering
+/docker-compose.yml             @contoso/platform-engineering
+/infra/                         @contoso/platform-engineering @contoso/security
+/scripts/                       @contoso/platform-engineering
+/.github/                       @contoso/platform-engineering @contoso/security
+/.github/CODEOWNERS             @contoso/security
+/docs/DEPLOYMENT.md             @contoso/platform-engineering
+/SECURITY.md                    @contoso/security

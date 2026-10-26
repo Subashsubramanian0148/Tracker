@@ -1,0 +1,423 @@
+// Data model for ADO Metrics.
+// Raw history (work_item_revision) is synced from Azure DevOps; the *_segment, *_interval and
+// work_item_change tables are derived from it by the metrics engine and can be rebuilt at any time.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Azure DevOps mirror
+// ---------------------------------------------------------------------------
+
+model Project {
+  id                         String    @id @db.Uuid
+  name                       String
+  description                String?
+  lastSyncedAt               DateTime? @map("last_synced_at")
+  /// Continuation token for the reporting revisions API (incremental sync).
+  revisionsContinuationToken String?   @map("revisions_continuation_token")
+  /// Columns of the team's Azure DevOps board, in order: [{ name, states }]. Null until synced.
+  boardColumns               Json?     @map("board_columns")
+  createdAt                  DateTime  @default(now()) @map("created_at")
+  updatedAt                  DateTime  @updatedAt @map("updated_at")
+
+  teams       Team[]
+  iterations  Iteration[]
+  workItems   WorkItem[]
+  stateMap    WorkItemTypeState[]
+
+  @@map("project")
+}
+
+model Team {
+  id        String   @id @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  name      String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project    Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  members    TeamMember[]
+  areas      TeamArea[]
+  iterations TeamIteration[]
+
+  @@index([projectId])
+  @@map("team")
+}
+
+model TeamMember {
+  teamId      String  @map("team_id") @db.Uuid
+  personId    String  @map("person_id")
+  isTeamAdmin Boolean @default(false) @map("is_team_admin")
+
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, personId])
+  @@index([personId])
+  @@map("team_member")
+}
+
+/// Area paths owned by a team (ADO "team field values"); used to scope metrics to a team.
+model TeamArea {
+  teamId          String  @map("team_id") @db.Uuid
+  areaPath        String  @map("area_path")
+  includeChildren Boolean @default(true) @map("include_children")
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, areaPath])
+  @@map("team_area")
+}
+
+model Iteration {
+  id         String    @id @db.Uuid
+  projectId  String    @map("project_id") @db.Uuid
+  name       String
+  path       String
+  startDate  DateTime? @map("start_date")
+  finishDate DateTime? @map("finish_date")
+
+  project Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  teams   TeamIteration[]
+
+  @@unique([projectId, path])
+  @@map("iteration")
+}
+
+model TeamIteration {
+  teamId      String @map("team_id") @db.Uuid
+  iterationId String @map("iteration_id") @db.Uuid
+
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  iteration Iteration @relation(fields: [iterationId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, iterationId])
+  @@map("team_iteration")
+}
+
+/// State -> category mapping per work item type, so custom/inherited states still compute correctly.
+model WorkItemTypeState {
+  projectId    String @map("project_id") @db.Uuid
+  workItemType String @map("work_item_type")
+  state        String
+  category     String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, workItemType, state])
+  @@map("work_item_type_state")
+}
+
+/// An Azure DevOps identity (from AssignedTo / ChangedBy / team membership).
+model Person {
+  id          String @id
+  displayName String @map("display_name")
+  /// UPN / email, lower-cased. Used to match the signed-in Entra user to ADO identities.
+  uniqueName  String @map("unique_name")
+
+  teams TeamMember[]
+
+  @@index([uniqueName])
+  @@map("person")
+}
+
+model WorkItem {
+  id                 Int       @id
+  projectId          String    @map("project_id") @db.Uuid
+  type               String
+  title              String
+  state              String
+  stateCategory      String    @map("state_category")
+  reason             String?
+  assignedToId       String?   @map("assigned_to_id")
+  iterationPath      String?   @map("iteration_path")
+  areaPath           String?   @map("area_path")
+  parentId           Int?      @map("parent_id")
+  tags               String[]
+  effort             Float?
+  originalEstimate   Float?    @map("original_estimate")
+  remainingWork      Float?    @map("remaining_work")
+  completedWork      Float?    @map("completed_work")
+  /// Plain text (HTML stripped server-side).
+  description        String?
+  acceptanceCriteria String?   @map("acceptance_criteria")
+  createdDate        DateTime  @map("created_date")
+  changedDate        DateTime  @map("changed_date")
+  rev                Int
+  isDeleted          Boolean   @default(false) @map("is_deleted")
+  boardColumn        String?   @map("board_column")
+
+  // Derived by the metrics engine.
+  activatedDate      DateTime? @map("activated_date")
+  completedDate      DateTime? @map("completed_date")
+  cycleTimeHours     Float?    @map("cycle_time_hours")
+  leadTimeHours      Float?    @map("lead_time_hours")
+  blockedHours       Float     @default(0) @map("blocked_hours")
+  reopenCount        Int       @default(0) @map("reopen_count")
+  initialEffort      Float?    @map("initial_effort")
+  initialRemaining   Float?    @map("initial_remaining")
+  isDelayed          Boolean   @default(false) @map("is_delayed")
+  delayFlags         String[]  @map("delay_flags")
+  delayDetectedAt    DateTime? @map("delay_detected_at")
+  /// Time held up by reopen/blocked comments until a later done/unblocked comment (or completion).
+  commentDelayHours  Float     @default(0) @map("comment_delay_hours")
+  metricsComputedAt  DateTime? @map("metrics_computed_at")
+
+  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisions    WorkItemRevision[]
+  segments     StateSegment[]
+  intervals    IterationInterval[]
+  changes      WorkItemChange[]
+  delayReasons DelayReason[]
+  comments     WorkItemComment[]
+
+  @@index([projectId, stateCategory])
+  @@index([projectId, changedDate])
+  @@index([projectId, completedDate])
+  @@index([projectId, iterationPath])
+  @@index([projectId, isDelayed])
+  @@index([assignedToId])
+  @@index([parentId])
+  @@map("work_item")
+}
+
+/// One row per ADO revision with the tracked field snapshot (see ado/fields.ts).
+/// Discussion comments synced from Azure DevOps (plain text, HTML stripped). Replaced on each sync of the item.
+model WorkItemComment {
+  workItemId Int      @map("work_item_id")
+  commentId  Int      @map("comment_id")
+  projectId  String   @map("project_id") @db.Uuid
+  authorId   String?  @map("author_id")
+  authorName String   @map("author_name")
+  authorUniqueName String @default("") @map("author_unique_name")
+  text       String
+  /// Keyword signals found in the text: REOPEN, BLOCKED, UNBLOCKED, DONE.
+  signals    String[]
+  createdAt  DateTime @map("created_at")
+  modifiedAt DateTime? @map("modified_at")
+
+  workItem WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+
+  @@id([workItemId, commentId])
+  @@index([projectId])
+  @@map("work_item_comment")
+}
+
+model WorkItemRevision {
+  workItemId  Int      @map("work_item_id")
+  rev         Int
+  projectId   String   @map("project_id") @db.Uuid
+  changedDate DateTime @map("changed_date")
+  changedById String?  @map("changed_by_id")
+  fields      Json
+
+  workItem WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+
+  @@id([workItemId, rev])
+  @@index([projectId, changedDate])
+  @@map("work_item_revision")
+}
+
+model StateSegment {
+  id            BigInt    @id @default(autoincrement())
+  workItemId    Int       @map("work_item_id")
+  projectId     String    @map("project_id") @db.Uuid
+  state         String
+  category      String
+  enteredAt     DateTime  @map("entered_at")
+  exitedAt      DateTime? @map("exited_at")
+  durationHours Float     @map("duration_hours")
+
+  workItem WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+
+  @@index([workItemId])
+  @@index([projectId, enteredAt])
+  @@map("state_segment")
+}
+
+/// Time a work item spent assigned to an iteration path; drives sprint health.
+model IterationInterval {
+  id            BigInt    @id @default(autoincrement())
+  workItemId    Int       @map("work_item_id")
+  projectId     String    @map("project_id") @db.Uuid
+  iterationPath String    @map("iteration_path")
+  enteredAt     DateTime  @map("entered_at")
+  exitedAt      DateTime? @map("exited_at")
+
+  workItem WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, iterationPath])
+  @@index([workItemId])
+  @@map("iteration_interval")
+}
+
+model WorkItemChange {
+  id               BigInt   @id @default(autoincrement())
+  workItemId       Int      @map("work_item_id")
+  projectId        String   @map("project_id") @db.Uuid
+  rev              Int
+  changedAt        DateTime @map("changed_at")
+  changedById      String?  @map("changed_by_id")
+  kind             String
+  field            String
+  oldValue         String?  @map("old_value")
+  newValue         String?  @map("new_value")
+  afterWorkStarted Boolean  @map("after_work_started")
+
+  workItem WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+
+  @@index([workItemId])
+  @@index([projectId, changedAt])
+  @@map("work_item_change")
+}
+
+// ---------------------------------------------------------------------------
+// Application data
+// ---------------------------------------------------------------------------
+
+model DelayCategory {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  reasons DelayReason[]
+
+  @@map("delay_category")
+}
+
+/// Append-only: a new entry supersedes the previous one; nothing is updated in place except supersededAt.
+model DelayReason {
+  id            String    @id @default(uuid()) @db.Uuid
+  workItemId    Int       @map("work_item_id")
+  categoryId    String    @map("category_id") @db.Uuid
+  comment       String
+  impactDays    Float?    @map("impact_days")
+  createdById   String    @map("created_by_id")
+  createdByName String    @map("created_by_name")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  supersededAt  DateTime? @map("superseded_at")
+
+  workItem WorkItem      @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  category DelayCategory @relation(fields: [categoryId], references: [id])
+
+  @@index([workItemId, createdAt])
+  @@map("delay_reason")
+}
+
+model AppUser {
+  /// Entra ID object id (oid claim).
+  id          String   @id
+  displayName String   @map("display_name")
+  email       String
+  lastLoginAt DateTime @map("last_login_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("app_user")
+}
+
+model Session {
+  sid       String   @id
+  data      Json
+  expiresAt DateTime @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("session")
+}
+
+/// Tamper-evident audit trail: each row's hash covers the previous row's hash.
+/// UPDATE/DELETE are blocked by a trigger (see migration) except for the retention job.
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  actorId    String?  @map("actor_id")
+  actorName  String?  @map("actor_name")
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  outcome    String
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  traceId    String?  @map("trace_id")
+  details    Json?
+  prevHash   String?  @map("prev_hash")
+  hash       String
+
+  @@index([occurredAt])
+  @@index([actorId, occurredAt])
+  @@index([action, occurredAt])
+  @@map("audit_log")
+}
+
+/// Cross-replica mutual exclusion for background jobs (sync, retention).
+model JobLease {
+  name      String   @id
+  holder    String
+  expiresAt DateTime @map("expires_at")
+
+  @@map("job_lease")
+}
+
+model SyncRun {
+  id                String    @id @default(uuid()) @db.Uuid
+  projectId         String?   @map("project_id") @db.Uuid
+  trigger           String
+  status            String
+  startedAt         DateTime  @default(now()) @map("started_at")
+  finishedAt        DateTime? @map("finished_at")
+  itemsUpserted     Int       @default(0) @map("items_upserted")
+  revisionsUpserted Int       @default(0) @map("revisions_upserted")
+  error             String?
+
+  @@index([startedAt])
+  @@map("sync_run")
+}
+
+/// Designer task tracker (Mode 1): work people log by hand, independent of Azure DevOps.
+model Task {
+  id            String    @id @default(uuid()) @db.Uuid
+  ownerId       String    @map("owner_id")
+  ownerName     String    @map("owner_name")
+  title         String
+  notes         String?
+  /// upcoming | started | in_progress | approval_pending | completed | reopened
+  status        String    @default("upcoming")
+  /// Optional link to the Azure DevOps item the task belongs to.
+  workItemId    Int?      @map("work_item_id")
+  dueDate       DateTime? @map("due_date") @db.Date
+  estimateHours Float?    @map("estimate_hours")
+  spentHours    Float     @default(0) @map("spent_hours")
+  startedAt     DateTime? @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  comments      TaskComment[]
+
+  @@index([ownerId, status])
+  @@index([status, dueDate])
+  @@index([completedAt])
+  @@map("task")
+}
+
+/// Discussion on a task. Comments are kept as written; there is no edit.
+model TaskComment {
+  id         String   @id @default(uuid()) @db.Uuid
+  taskId     String   @map("task_id") @db.Uuid
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId   String   @map("author_id")
+  authorName String   @map("author_name")
+  body       String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([taskId, createdAt])
+  @@map("task_comment")
+}

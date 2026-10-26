@@ -1,0 +1,97 @@
+# Local development / demo stack and the DAST target in CI. Not used in Azure.
+#
+#   cp .env.example .env          # then fill in values (see docs/DEPLOYMENT.md#local-run)
+#   docker compose up --build -d --wait app
+#   open http://localhost:3000
+#
+# Auth runs in `dev` mode here, which the app only accepts when NODE_ENV != production.
+# CI sets APP_IMAGE / MIGRATOR_IMAGE to pre-built, scanned images and runs with --no-build.
+
+name: ado-metrics
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ado_metrics
+      POSTGRES_USER: ado_metrics
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [backend]
+    # Not published on the host. Use `docker compose exec db psql -U ado_metrics` for access.
+    cap_drop: [ALL]
+    # The postgres entrypoint chowns its data directory and drops to the postgres user.
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    security_opt: ["no-new-privileges:true"]
+    shm_size: 128m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ado_metrics -d ado_metrics"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  migrate:
+    <<: *hardening
+    image: ${MIGRATOR_IMAGE:-ado-metrics-migrator:local}
+    build:
+      context: .
+      target: migrator
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://ado_metrics:${POSTGRES_PASSWORD}@db:5432/ado_metrics?schema=public
+    networks: [backend]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    <<: *hardening
+    image: ${APP_IMAGE:-ado-metrics:local}
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: true
+    # Values here override .env so the local stack can never run with production auth settings.
+    environment:
+      NODE_ENV: development
+      AUTH_MODE: dev
+      PORT: "3000"
+      PUBLIC_BASE_URL: http://localhost:3000
+      TRUST_PROXY_HOPS: "0"
+      STATIC_DIR: /app/apps/web/dist
+      DATABASE_URL: postgresql://ado_metrics:${POSTGRES_PASSWORD}@db:5432/ado_metrics?schema=public
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks: [backend, egress]
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 1.0
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+networks:
+  # No route outside the host: the database is reachable only from app and migrate.
+  backend:
+    internal: true
+  # Outbound access for the app (Entra ID, Azure DevOps) and the published port.
+  egress: {}
+
+volumes:
+  pgdata:

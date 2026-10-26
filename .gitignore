@@ -1,0 +1,27 @@
+node_modules/
+dist/
+build/
+coverage/
+*.log
+.DS_Store
+
+# Environment and secrets - never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+
+# Local tooling
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.turbo/
+zap-report.*
+
+# Generated Prisma client
+apps/api/src/generated/
+
+# Local assistant/editor settings
+.claude/
