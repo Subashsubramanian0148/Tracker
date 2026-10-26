@@ -26,29 +26,32 @@ export function ChangesTable({ changes }: { changes: WorkItemChange[] }) {
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-end gap-3">
-        <Select
-          label="Change type"
-          className="w-48"
-          value={kind}
-          onChange={setKind}
-          options={[
-            { value: ALL, label: 'All changes' },
-            ...kinds.map((k) => ({ value: k, label: CHANGE_KIND_LABELS[k as ChangeKind] ?? k })),
-          ]}
-        />
-        <div className="inline-flex h-9 items-center gap-2">
-          <Checkbox
-            id="scope-only"
-            checked={scopeOnly}
-            onCheckedChange={(c) => setScopeOnly(c === true)}
-            className="cursor-pointer"
+      {/* Filters only help once the list is long. */}
+      {changes.length > 5 ? (
+        <div className="mb-3 flex flex-wrap items-end gap-3">
+          <Select
+            label="Change type"
+            className="w-48"
+            value={kind}
+            onChange={setKind}
+            options={[
+              { value: ALL, label: 'All changes' },
+              ...kinds.map((k) => ({ value: k, label: CHANGE_KIND_LABELS[k as ChangeKind] ?? k })),
+            ]}
           />
-          <Label htmlFor="scope-only" className="cursor-pointer font-normal">
-            Only scope changes ({scopeCount})
-          </Label>
+          <div className="inline-flex h-9 items-center gap-2">
+            <Checkbox
+              id="scope-only"
+              checked={scopeOnly}
+              onCheckedChange={(c) => setScopeOnly(c === true)}
+              className="cursor-pointer"
+            />
+            <Label htmlFor="scope-only" className="cursor-pointer font-normal">
+              Only scope changes ({scopeCount})
+            </Label>
+          </div>
         </div>
-      </div>
+      ) : null}
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No changes match this filter.</p>
       ) : (

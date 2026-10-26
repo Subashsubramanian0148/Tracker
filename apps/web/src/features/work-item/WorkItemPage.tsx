@@ -1,7 +1,18 @@
 import { Hint } from '../../components/ui/Tooltip';
 import type { EstimateSummary, WorkItemDetail } from '@ado-metrics/shared';
 import clsx from 'clsx';
-import { ArrowLeft, ExternalLink, TriangleAlert } from 'lucide-react';
+import {
+  ArrowLeft,
+  Clock,
+  ExternalLink,
+  FileText,
+  GitCompareArrows,
+  ListTree,
+  MessageSquare,
+  Target,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { isApiError } from '../../api/client';
@@ -10,7 +21,7 @@ import { NotFoundPage } from '../../app/ErrorPages';
 import { useProject } from '../../app/projectContext';
 import { Avatar } from '../../components/ui/Avatar';
 import { Badge } from '../../components/ui/Badge';
-import { Card, CardHeader } from '../../components/ui/Card';
+import { Card as BaseCard } from '../../components/ui/Card';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { canAddDelayReason, useMe } from '../../lib/auth';
@@ -77,6 +88,44 @@ function Detail({ item, projectId }: { item: WorkItemDetail; projectId: string }
   const url = safeExternalUrl(item.url);
   const canAdd = canAddDelayReason(me.user, item.assignedTo);
   const base = `/projects/${encodeURIComponent(projectId)}`;
+  const hasHistory = item.timeInState.some((t) => t.hours > 0);
+  const midWork = item.changes.filter((c) => c.afterWorkStarted);
+  // Delay reasons matter once something is late or already explained.
+  const showDelay = item.isDelayed || item.delayReasons.length > 0;
+
+  // Only the signals that say something about this item; zeros and blanks are left out.
+  const signals = [
+    item.cycleTimeDays !== null ? (
+      <KpiChip key="cycle" label="Cycle time" value={formatDays(item.cycleTimeDays)} />
+    ) : null,
+    item.leadTimeDays !== null ? (
+      <KpiChip key="lead" label="Lead time" value={formatDays(item.leadTimeDays)} />
+    ) : null,
+    item.blockedHours > 0 ? (
+      <KpiChip key="blocked" label="Blocked" value={formatHours(item.blockedHours)} warn />
+    ) : null,
+    item.reopenCount > 0 ? (
+      <KpiChip key="reopen" label="Reopened" value={`${item.reopenCount}×`} warn />
+    ) : null,
+    item.commentDelayDays > 0 ? (
+      <KpiChip
+        key="comments"
+        label="Delay from comments"
+        value={formatDays(item.commentDelayDays)}
+        warn
+        title="Time between reopen or blocked comments and the next done or unblocked comment"
+      />
+    ) : null,
+    item.sprintsSpanned.length > 1 ? (
+      <KpiChip
+        key="sprints"
+        label="Sprints spanned"
+        value={formatNumber(item.sprintsSpanned.length)}
+        warn
+        title={item.sprintsSpanned.join(', ')}
+      />
+    ) : null,
+  ].filter(Boolean);
 
   return (
     <article className="space-y-5" aria-labelledby="wi-title">
@@ -118,18 +167,10 @@ function Detail({ item, projectId }: { item: WorkItemDetail; projectId: string }
               {item.title}
             </h2>
             <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-              <Meta label="Assignee">
-                <span className="inline-flex items-center gap-2">
-                  <Avatar
-                    name={item.assignedTo?.displayName}
-                    seed={item.assignedTo?.id}
-                    size="xs"
-                  />
-                  {item.assignedTo?.displayName ?? 'Unassigned'}
-                </span>
-              </Meta>
-              <Meta label="Type">{item.type}</Meta>
-              <Meta label="Iteration">{item.iterationPath ?? '—'}</Meta>
+              {/* A path with no sprint segment is just the project: no sprint to show. */}
+              {item.iterationPath?.includes('\\') ? (
+                <Meta label="Sprint">{item.iterationPath.split('\\').pop()}</Meta>
+              ) : null}
               {item.dueDate ? (
                 <Meta label="Sprint ends">{formatShortDate(item.dueDate)}</Meta>
               ) : null}
@@ -149,122 +190,117 @@ function Detail({ item, projectId }: { item: WorkItemDetail; projectId: string }
             </a>
           ) : null}
         </div>
-        <ul className="mt-5 flex flex-wrap gap-2" aria-label="Key metrics">
-          <KpiChip label="Cycle time" value={formatDays(item.cycleTimeDays)} />
-          <KpiChip label="Lead time" value={formatDays(item.leadTimeDays)} />
-          <KpiChip
-            label="Blocked"
-            value={formatHours(item.blockedHours)}
-            warn={item.blockedHours > 0}
-          />
-          <KpiChip label="Reopened" value={`${item.reopenCount}×`} warn={item.reopenCount > 0} />
-          <KpiChip
-            label="Delay from comments"
-            value={formatDays(item.commentDelayDays)}
-            warn={item.commentDelayDays > 0}
-            title="Time between reopen or blocked comments and the next done or unblocked comment"
-          />
-          <KpiChip
-            label="Sprints spanned"
-            value={formatNumber(item.sprintsSpanned.length)}
-            warn={item.sprintsSpanned.length > 1}
-            title={item.sprintsSpanned.join(', ')}
-          />
-        </ul>
+        {signals.length > 0 ? (
+          <ul className="mt-5 flex flex-wrap gap-2" aria-label="Key metrics">
+            {signals}
+          </ul>
+        ) : null}
       </Card>
+
+      <DeliveryCard item={item} />
 
       <Card>
-        <CardHeader title="State timeline" description="Width shows time spent in each state" />
-        <StateTimeline segments={item.stateTimeline} />
-      </Card>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Time in state" />
-          {item.timeInState.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No state history.</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {item.timeInState.map((t) => (
-                <li
-                  key={t.state}
-                  className="flex items-center justify-between gap-3 py-2.5 text-sm"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <span
-                      aria-hidden
-                      className={clsx('size-2.5 rounded-full', STATE_CATEGORY_BG[t.category])}
-                    />
-                    {t.state}
-                  </span>
-                  <span className="font-medium tabular-nums">{formatHours(t.hours)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-        <EstimateCard estimate={item.estimate} />
-      </div>
-
-      {item.description || item.acceptanceCriteria ? (
-        <Card>
-          {item.description ? (
-            <>
-              <CardHeader title="Description" />
+        <CardHeader title="Story" icon={FileText} />
+        {item.description || item.acceptanceCriteria ? (
+          <>
+            {item.description ? (
               <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-ink-soft">
                 {item.description}
               </p>
-            </>
-          ) : null}
-          {item.acceptanceCriteria ? (
-            <div className={clsx(item.description && 'mt-6')}>
-              <CardHeader title="Acceptance criteria" />
-              <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-ink-soft">
-                {item.acceptanceCriteria}
-              </p>
-            </div>
-          ) : null}
-        </Card>
-      ) : null}
+            ) : null}
+            {item.acceptanceCriteria ? (
+              <div className={clsx(item.description && 'mt-5')}>
+                <h4 className="mb-1.5 text-[13px] font-semibold text-ink">Acceptance criteria</h4>
+                <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-ink-soft">
+                  {item.acceptanceCriteria}
+                </p>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No description yet. The Description and Acceptance Criteria fields from Azure DevOps
+            show here.
+          </p>
+        )}
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Changes during work"
+          icon={GitCompareArrows}
+          description="What changed after work started: scope, requirements, owner or sprint"
+        />
+        {midWork.length > 0 ? (
+          <ChangesTable changes={midWork} />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Nothing changed after work started. Edits to effort, requirements, owner or sprint made
+            while in progress will list here.
+          </p>
+        )}
+      </Card>
 
       <Card>
         <CardHeader
           title="Comments"
-          description="From Azure DevOps. Tags show the words the delay signals were read from (reopen, blocked, done…)"
+          icon={MessageSquare}
+          description="From Azure DevOps, including the completion note"
         />
         <AzureComments comments={item.comments} />
       </Card>
 
-      <Card>
-        <CardHeader
-          title="Changes"
-          description="Highlighted rows changed after work started (scope changes)"
-        />
-        <ChangesTable changes={item.changes} />
-      </Card>
+      {showDelay ? (
+        <section
+          id="delay-reason"
+          tabIndex={-1}
+          aria-labelledby="delay-reason-title"
+          className="scroll-mt-4 rounded-2xl border border-line bg-surface p-6 outline-none"
+        >
+          <SectionTitle id="delay-reason-title" icon={TriangleAlert} title="Delay reasons" />
+          <div className={clsx('grid gap-6', canAdd && 'lg:grid-cols-2')}>
+            <DelayReasonHistory reasons={item.delayReasons} />
+            {canAdd ? (
+              <div className="rounded-2xl bg-sidebar p-5">
+                <DelayReasonForm projectId={projectId} workItemId={item.id} />
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
-      <section
-        id="delay-reason"
-        tabIndex={-1}
-        aria-labelledby="delay-reason-title"
-        className="scroll-mt-4 rounded-2xl border border-line bg-surface p-5 outline-none"
-      >
-        <h3 id="delay-reason-title" className="mb-4 text-base font-semibold">
-          Delay reasons
-        </h3>
-        <div className={clsx('grid gap-6', canAdd && 'lg:grid-cols-2')}>
-          <DelayReasonHistory reasons={item.delayReasons} />
-          {canAdd ? (
-            <div className="rounded-2xl bg-sidebar p-5">
-              <DelayReasonForm projectId={projectId} workItemId={item.id} />
-            </div>
-          ) : null}
-        </div>
-      </section>
+      {hasHistory ? (
+        <Card>
+          <CardHeader
+            title="Time in each state"
+            icon={Clock}
+            description="Where this item spent its time"
+          />
+          <StateTimeline segments={item.stateTimeline} />
+          <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            {item.timeInState.map((t) => (
+              <li key={t.state} className="inline-flex items-center gap-2">
+                <span
+                  aria-hidden
+                  className={clsx('size-2.5 rounded-full', STATE_CATEGORY_BG[t.category])}
+                />
+                <span className="text-muted-foreground">{t.state}</span>
+                <span className="font-medium tabular-nums">{formatHours(t.hours)}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
+      {hasEstimate(item.estimate) ? <EstimateCard estimate={item.estimate} /> : null}
 
       {item.children.length > 0 ? (
         <Card>
-          <CardHeader title="Children" description={`${item.children.length} linked items`} />
+          <CardHeader
+            title="Children"
+            icon={ListTree}
+            description={`${item.children.length} linked items`}
+          />
           <ul className="divide-y divide-line">
             {item.children.map((c) => (
               <li key={c.id}>
@@ -296,6 +332,148 @@ function Detail({ item, projectId }: { item: WorkItemDetail; projectId: string }
     </article>
   );
 }
+
+const FIGMA_URL = /https:\/\/(?:www\.)?figma\.com\/[^\s)"'<>\]]+/g;
+
+/** Latest Figma link mentioned in the story or its comments (the hand-off is usually last). */
+export function findFigmaLink(item: WorkItemDetail): string | null {
+  const texts = [item.description, item.acceptanceCriteria, ...item.comments.map((c) => c.text)];
+  const links = texts.flatMap((t) => (t ? (t.match(FIGMA_URL) ?? []) : []));
+  return links.length ? safeExternalUrl(links[links.length - 1]!) : null;
+}
+
+/** Whole calendar days from start to finish, counting the start day. */
+function daysBetween(fromIso: string, toIso: string): number {
+  const day = 86_400_000;
+  const from = new Date(fromIso);
+  const to = new Date(toIso);
+  return Math.max(1, Math.round((to.setHours(0, 0, 0, 0) - from.setHours(0, 0, 0, 0)) / day) + 1);
+}
+
+/** Who has it and when it started; once done, when it finished, how long it took, and the design. */
+function DeliveryCard({ item }: { item: WorkItemDetail }) {
+  const done = item.stateCategory === 'Completed';
+  const figma = done ? findFigmaLink(item) : null;
+  const days =
+    item.activatedDate && item.completedDate
+      ? daysBetween(item.activatedDate, item.completedDate)
+      : null;
+  return (
+    <Card className="p-0!">
+      <dl className="grid grid-cols-2 sm:grid-cols-5 [&>div]:border-line [&>div]:px-5 [&>div]:py-4 sm:[&>div+div]:border-l">
+        <div>
+          <dt className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase">
+            Assigned to
+          </dt>
+          <dd className="mt-1.5 flex items-center gap-2 text-sm font-medium">
+            <Avatar name={item.assignedTo?.displayName} seed={item.assignedTo?.id} size="xs" />
+            <span className="truncate">{item.assignedTo?.displayName ?? 'Unassigned'}</span>
+          </dd>
+        </div>
+        <Fact label="Start date">
+          {item.activatedDate ? (
+            formatShortDate(item.activatedDate)
+          ) : (
+            <Pending>Set when it moves to In progress</Pending>
+          )}
+        </Fact>
+        <Fact label="End date">
+          {done ? (
+            formatShortDate(item.completedDate)
+          ) : (
+            <Pending>Set when it moves to Done</Pending>
+          )}
+        </Fact>
+        <Fact label="Days to deliver">
+          {days !== null ? (
+            `${days} ${days === 1 ? 'day' : 'days'}`
+          ) : (
+            <Pending>Start to end, once done</Pending>
+          )}
+        </Fact>
+        <div>
+          <dt className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase">
+            Figma
+          </dt>
+          <dd className="mt-1.5 text-sm">
+            {figma ? (
+              <a
+                href={figma}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+              >
+                Open design
+                <ExternalLink aria-hidden className="size-3.5" />
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            ) : (
+              <Pending>
+                {done
+                  ? 'Paste a figma.com link in a comment'
+                  : 'Shown once done, from a figma.com link'}
+              </Pending>
+            )}
+          </dd>
+        </div>
+      </dl>
+    </Card>
+  );
+}
+
+/** Muted hint saying what will fill a field and when. */
+function Pending({ children }: { children: ReactNode }) {
+  return <span className="text-[13px] font-normal text-muted-foreground">{children}</span>;
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <dt className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase">
+        {label}
+      </dt>
+      <dd className="mt-1.5 text-sm font-medium tabular-nums">{children}</dd>
+    </div>
+  );
+}
+
+/** Cards on this page match the Overview: hairline border, no shadow, roomier padding. */
+function Card({ className, ...props }: React.ComponentProps<typeof BaseCard>) {
+  return (
+    <BaseCard className={clsx('rounded-2xl border-line p-6 shadow-none', className)} {...props} />
+  );
+}
+
+/** Overview-style card heading: quiet icon tile, title and optional subtitle. */
+function SectionTitle({
+  icon: Icon,
+  title,
+  description,
+  id,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description?: ReactNode;
+  id?: string;
+}) {
+  return (
+    <div className="mb-5 flex items-start gap-3">
+      <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-sidebar text-ink-soft">
+        <Icon aria-hidden className="size-4" strokeWidth={1.75} />
+      </span>
+      <div className="min-w-0">
+        <h3 id={id} className="text-[15px] leading-5 font-semibold tracking-[-0.01em] text-ink">
+          {title}
+        </h3>
+        {description ? (
+          <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">{description}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+const CardHeader = SectionTitle;
 
 function Meta({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -342,59 +520,75 @@ function ratioTone(r: number | null): string {
   return 'text-danger';
 }
 
+/** True when there is an estimate, logged work, or an effort change worth showing. */
+function hasEstimate(e: EstimateSummary): boolean {
+  return (
+    e.originalEstimateHours !== null ||
+    e.completedWorkHours !== null ||
+    e.estimateVsActualRatio !== null ||
+    (e.initialEffort !== null && e.effort !== null && e.initialEffort !== e.effort)
+  );
+}
+
 function EstimateCard({ estimate: e }: { estimate: EstimateSummary }) {
   const effortChanged =
     e.initialEffort !== null && e.effort !== null && e.initialEffort !== e.effort;
   return (
     <Card>
-      <CardHeader title="Estimate vs actual" />
-      <dl className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl bg-sidebar px-3 py-3">
-          <dt className="text-xs text-muted-foreground">Effort (initial → current)</dt>
-          <dd className="mt-1 text-lg font-semibold tabular-nums">
-            {e.initialEffort ?? '—'} →{' '}
-            <span className={clsx(effortChanged && 'text-warn-strong')}>{e.effort ?? '—'}</span>
-          </dd>
-        </div>
-        <div className="rounded-xl bg-sidebar px-3 py-3">
-          <dt className="text-xs text-muted-foreground">Actual / estimate</dt>
-          <dd
-            className={clsx(
-              'mt-1 text-lg font-semibold tabular-nums',
-              ratioTone(e.estimateVsActualRatio),
+      <CardHeader title="Estimate vs actual" icon={Target} />
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {e.effort !== null ? (
+          <Cell label={effortChanged ? 'Effort (initial → current)' : 'Effort'}>
+            {effortChanged ? (
+              <>
+                {e.initialEffort} → <span className="text-warn-strong">{e.effort}</span>
+              </>
+            ) : (
+              e.effort
             )}
-          >
+          </Cell>
+        ) : null}
+        {e.originalEstimateHours !== null ? (
+          <Cell label="Original estimate">{formatHours(e.originalEstimateHours)}</Cell>
+        ) : null}
+        {e.completedWorkHours !== null ? (
+          <Cell label="Completed work">{formatHours(e.completedWorkHours)}</Cell>
+        ) : null}
+        {e.remainingWorkHours ? (
+          <Cell label="Remaining">{formatHours(e.remainingWorkHours)}</Cell>
+        ) : null}
+        {e.estimateVsActualRatio !== null ? (
+          <Cell label="Actual / estimate" className={ratioTone(e.estimateVsActualRatio)}>
             {formatRatio(e.estimateVsActualRatio)}
-            {e.estimateVsActualRatio !== null ? (
-              <span className="sr-only">
-                {e.estimateVsActualRatio > 1.2
-                  ? ' (over estimate)'
-                  : e.estimateVsActualRatio < 0.8
-                    ? ' (under estimate)'
-                    : ' (on target)'}
-              </span>
-            ) : null}
-          </dd>
-        </div>
-        <div className="rounded-xl bg-sidebar px-3 py-3">
-          <dt className="text-xs text-muted-foreground">Original estimate</dt>
-          <dd className="mt-1 text-lg font-semibold tabular-nums">
-            {formatHours(e.originalEstimateHours)}
-          </dd>
-        </div>
-        <div className="rounded-xl bg-sidebar px-3 py-3">
-          <dt className="text-xs text-muted-foreground">Completed work</dt>
-          <dd className="mt-1 text-lg font-semibold tabular-nums">
-            {formatHours(e.completedWorkHours)}
-            {e.remainingWorkHours ? (
-              <span className="ml-1 text-xs font-normal text-muted-foreground">
-                +{formatHours(e.remainingWorkHours)} left
-              </span>
-            ) : null}
-          </dd>
-        </div>
+            <span className="sr-only">
+              {e.estimateVsActualRatio > 1.2
+                ? ' (over estimate)'
+                : e.estimateVsActualRatio < 0.8
+                  ? ' (under estimate)'
+                  : ' (on target)'}
+            </span>
+          </Cell>
+        ) : null}
       </dl>
     </Card>
+  );
+}
+
+/** One filled estimate figure; empty ones are left out rather than shown as dashes. */
+function Cell({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-xl bg-sidebar px-3 py-3">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={clsx('mt-1 text-lg font-semibold tabular-nums', className)}>{children}</dd>
+    </div>
   );
 }
 

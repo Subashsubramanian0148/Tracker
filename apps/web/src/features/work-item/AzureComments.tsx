@@ -13,7 +13,12 @@ const SIGNAL: Record<CommentSignal, { label: string; tone: 'amber' | 'success' }
 /** Read-only discussion from Azure DevOps; keyword tags show what the delay signals were read from. */
 export function AzureComments({ comments }: { comments: WorkItemComment[] }) {
   if (comments.length === 0) {
-    return <p className="text-sm text-muted-foreground">No comments in Azure DevOps.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        No comments yet. The discussion from Azure DevOps shows here, with the completion note
+        tagged Done.
+      </p>
+    );
   }
   return (
     <ul className="space-y-4">

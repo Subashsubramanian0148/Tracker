@@ -1,4 +1,4 @@
-import type { StateCategory, StateSegment } from '@ado-metrics/shared';
+import type { StateSegment } from '@ado-metrics/shared';
 import clsx from 'clsx';
 import { Tooltip } from '../../components/ui/Tooltip';
 import { formatDateTime, formatHours } from '../../lib/format';
@@ -10,8 +10,6 @@ export function StateTimeline({ segments }: { segments: StateSegment[] }) {
   if (segments.length === 0 || total <= 0) {
     return <p className="text-sm text-muted-foreground">No state history recorded yet.</p>;
   }
-  const legend = new Map<string, StateCategory>();
-  for (const s of segments) if (!legend.has(s.state)) legend.set(s.state, s.category);
 
   return (
     <div>
@@ -63,17 +61,6 @@ export function StateTimeline({ segments }: { segments: StateSegment[] }) {
           );
         })}
       </ol>
-      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5" aria-label="Legend">
-        {[...legend.entries()].map(([state, cat]) => (
-          <li
-            key={state}
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
-          >
-            <span aria-hidden className={clsx('size-2.5 rounded-full', STATE_CATEGORY_BG[cat])} />
-            {state}
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

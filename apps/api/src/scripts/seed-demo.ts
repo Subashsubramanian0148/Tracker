@@ -208,7 +208,15 @@ async function seedComments(prisma: PrismaService, now: Date) {
       if (chance(0.6)) add(author, at + between(1, 4) * DAY_MS, pick(['Unblocked now, copy arrived.', 'No longer blocked, contract signed off.']));
     }
     if (item.completedDate) {
-      add(author, end - 0.2 * DAY_MS, pick(['Completed and handed off to dev.', 'Done, final files are in Figma.', 'Design signed off by the PM.']));
+      // Most hand-offs carry the Figma file; a few don't, so the page's "no link" state shows too.
+      const file = `https://www.figma.com/design/${(item.id * 7919).toString(36).toUpperCase()}DF/Team-2?node-id=${item.id}-1`;
+      add(
+        author,
+        end - 0.2 * DAY_MS,
+        chance(0.85)
+          ? pick([`Completed and handed off to dev. Final design: ${file}`, `Done, final files are in Figma: ${file}`, `Design signed off by the PM. ${file}`])
+          : 'Design signed off by the PM.',
+      );
     } else if (chance(0.12)) {
       add(author, now.getTime() - between(3, 6) * DAY_MS, 'Design is done, ready for dev.');
     }

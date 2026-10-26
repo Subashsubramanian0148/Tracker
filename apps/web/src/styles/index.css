@@ -210,6 +210,12 @@
   html {
     -webkit-text-size-adjust: 100%;
   }
+  /* Tailwind v4 borders default to currentColor (near-black); use the hairline token instead. */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-line);
+  }
   body {
     @apply bg-canvas font-sans text-ink antialiased;
   }
