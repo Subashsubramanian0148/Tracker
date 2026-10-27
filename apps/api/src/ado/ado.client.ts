@@ -20,6 +20,7 @@ import {
   teamsResponse,
   workItemTypeStatesResponse,
   workItemTypesResponse,
+  workItemRelationsResponse,
 } from './ado.schemas';
 import { REVISION_FIELDS } from './fields';
 
@@ -56,7 +57,9 @@ export class AdoClient {
   constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {
     this.credential =
       config.ADO_AUTH === 'managed-identity'
-        ? new ManagedIdentityCredential(config.AZURE_CLIENT_ID ? { clientId: config.AZURE_CLIENT_ID } : {})
+        ? new ManagedIdentityCredential(
+            config.AZURE_CLIENT_ID ? { clientId: config.AZURE_CLIENT_ID } : {},
+          )
         : config.ADO_AUTH === 'client-secret'
           ? new EnvironmentCredential()
           : null;
@@ -112,7 +115,11 @@ export class AdoClient {
   }
 
   async listBoards(projectId: string, teamId: string) {
-    const res = await this.get(`${seg(projectId)}/${seg(teamId)}/_apis/work/boards`, {}, boardsResponse);
+    const res = await this.get(
+      `${seg(projectId)}/${seg(teamId)}/_apis/work/boards`,
+      {},
+      boardsResponse,
+    );
     return res.value;
   }
 
@@ -126,7 +133,11 @@ export class AdoClient {
   }
 
   async listWorkItemTypes(projectId: string) {
-    const res = await this.get(`${seg(projectId)}/_apis/wit/workitemtypes`, {}, workItemTypesResponse);
+    const res = await this.get(
+      `${seg(projectId)}/_apis/wit/workitemtypes`,
+      {},
+      workItemTypesResponse,
+    );
     return res.value;
   }
 
@@ -140,7 +151,10 @@ export class AdoClient {
   }
 
   /** One batch of the reporting revisions feed; pass the returned token to continue. */
-  async reportingRevisions(projectId: string, opts: { continuationToken?: string; startDateTime?: Date }) {
+  async reportingRevisions(
+    projectId: string,
+    opts: { continuationToken?: string; startDateTime?: Date },
+  ) {
     const query: Record<string, string> = {};
     if (opts.continuationToken) query.continuationToken = opts.continuationToken;
     else if (opts.startDateTime) query.startDateTime = opts.startDateTime.toISOString();
@@ -165,13 +179,37 @@ export class AdoClient {
     const all: AdoComment[] = [];
     let continuationToken: string | undefined;
     do {
-      const query: Record<string, string> = { $top: '200', order: 'asc', 'api-version': COMMENTS_API_VERSION };
+      const query: Record<string, string> = {
+        $top: '200',
+        order: 'asc',
+        'api-version': COMMENTS_API_VERSION,
+      };
       if (continuationToken) query.continuationToken = continuationToken;
-      const res = await this.get(`${seg(projectId)}/_apis/wit/workItems/${workItemId}/comments`, query, commentsResponse);
+      const res = await this.get(
+        `${seg(projectId)}/_apis/wit/workItems/${workItemId}/comments`,
+        query,
+        commentsResponse,
+      );
       all.push(...res.comments.filter((c) => !c.isDeleted));
       continuationToken = res.continuationToken ?? undefined;
     } while (continuationToken);
     return all;
+  }
+
+  /** Files attached to one work item (name, link and size), from its relations. */
+  async listAttachments(projectId: string, workItemId: number) {
+    const res = await this.get(
+      `${seg(projectId)}/_apis/wit/workitems/${workItemId}`,
+      { $expand: 'relations' },
+      workItemRelationsResponse,
+    );
+    return (res.relations ?? [])
+      .filter((r) => r.rel === 'AttachedFile' && r.url.startsWith('https://'))
+      .map((r) => ({
+        url: r.url,
+        name: r.attributes?.name ?? 'Attachment',
+        sizeBytes: r.attributes?.resourceSize ?? null,
+      }));
   }
 
   workItemUrl(projectName: string, id: number): string {
@@ -186,7 +224,13 @@ export class AdoClient {
     do {
       const query: Record<string, string> = { $top: '500', stateFilter: 'wellFormed' };
       if (continuation) query.continuationToken = continuation;
-      const { body, headers } = await this.requestWithHeaders('GET', '_apis/projects', query, projectsResponse, auth);
+      const { body, headers } = await this.requestWithHeaders(
+        'GET',
+        '_apis/projects',
+        query,
+        projectsResponse,
+        auth,
+      );
       all.push(...body.value);
       continuation = headers.get('x-ms-continuationtoken') ?? undefined;
     } while (continuation);
@@ -245,13 +289,20 @@ export class AdoClient {
       const retryable = res.status === 429 || res.status >= 500;
       if (!retryable || attempt >= MAX_ATTEMPTS) {
         // Body is not logged: it may echo request data. Status + path is enough to diagnose.
-        throw new AdoRequestError(`Azure DevOps ${method} ${url.pathname} failed: ${res.status}`, res.status);
+        throw new AdoRequestError(
+          `Azure DevOps ${method} ${url.pathname} failed: ${res.status}`,
+          res.status,
+        );
       }
       const retryAfterSec = Number(res.headers.get('retry-after'));
-      const delayMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0
-        ? Math.min(retryAfterSec * 1000, 60_000)
-        : Math.min(2 ** attempt * 500, 15_000) + Math.floor(Math.random() * 250);
-      this.logger.warn({ status: res.status, path: url.pathname, attempt, delayMs }, 'ADO request retry');
+      const delayMs =
+        Number.isFinite(retryAfterSec) && retryAfterSec > 0
+          ? Math.min(retryAfterSec * 1000, 60_000)
+          : Math.min(2 ** attempt * 500, 15_000) + Math.floor(Math.random() * 250);
+      this.logger.warn(
+        { status: res.status, path: url.pathname, attempt, delayMs },
+        'ADO request retry',
+      );
       await sleep(delayMs);
     }
   }

@@ -6,6 +6,8 @@ export interface SessionUser {
   displayName: string;
   /** Lower-cased UPN / email. */
   email: string;
+  /** Shown under the name in the account menu; falls back to the email. */
+  jobTitle?: string;
   roles: Role[];
 }
 

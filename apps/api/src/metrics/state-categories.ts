@@ -23,7 +23,9 @@ const DEFAULTS: Record<string, StateCategory> = {
 };
 
 export function toCategory(value: string | null | undefined): StateCategory | null {
-  return (STATE_CATEGORIES as readonly string[]).includes(value ?? '') ? (value as StateCategory) : null;
+  return (STATE_CATEGORIES as readonly string[]).includes(value ?? '')
+    ? (value as StateCategory)
+    : null;
 }
 
 export function buildCategoryResolver(

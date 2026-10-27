@@ -4,11 +4,16 @@ import { Navigate } from 'react-router';
 import { ButtonLink } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { isAdmin, useMe } from '../lib/auth';
-import { readPref } from '../lib/prefs';
+import { readPref, writePref } from '../lib/prefs';
 
 export function RootRedirect() {
   const me = useMe();
   const last = readPref('lastProject');
+  // First visit on this browser: start with the welcome checklist.
+  if (readPref('welcomeSeen') === null) {
+    writePref('welcomeSeen', '1');
+    return <Navigate to="/welcome" replace />;
+  }
   const target = me.projects.find((p) => p.id === last) ?? me.projects[0];
   if (target)
     return <Navigate to={`/projects/${encodeURIComponent(target.id)}/${PROJECT_HOME}`} replace />;

@@ -1,3 +1,4 @@
+import { WorkItemProcessor } from '../metrics/work-item-processor.service';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   SCOPE_CHANGE_KINDS,
@@ -44,14 +45,21 @@ export class WorkItemsService {
     private readonly prisma: PrismaService,
     private readonly scope: ScopeService,
     private readonly ado: AdoClient,
+    private readonly processor: WorkItemProcessor,
   ) {}
 
-  async list(projectId: string, q: WorkItemListQuery, user: SessionUser): Promise<Paged<WorkItemSummary>> {
+  async list(
+    projectId: string,
+    q: WorkItemListQuery,
+    user: SessionUser,
+  ): Promise<Paged<WorkItemSummary>> {
     const searchId = q.search && /^\d{1,10}$/.test(q.search) ? Number(q.search) : null;
     const where: Prisma.WorkItemWhereInput = {
       AND: [
         { projectId, isDeleted: false },
-        q.stateCategory ? { stateCategory: q.stateCategory } : { stateCategory: { not: 'Removed' } },
+        q.stateCategory
+          ? { stateCategory: q.stateCategory }
+          : { stateCategory: { not: 'Removed' } },
         q.type ? { type: q.type } : {},
         q.iterationPath ? { iterationPath: q.iterationPath } : {},
         q.delayed === undefined ? {} : { isDelayed: q.delayed },
@@ -76,7 +84,12 @@ export class WorkItemsService {
         take: q.pageSize,
       }),
     ]);
-    return { page: q.page, pageSize: q.pageSize, total, items: await this.summaries(projectId, rows, user) };
+    return {
+      page: q.page,
+      pageSize: q.pageSize,
+      total,
+      items: await this.summaries(projectId, rows, user),
+    };
   }
 
   async summaries(
@@ -111,6 +124,9 @@ export class WorkItemsService {
         changes: { orderBy: [{ changedAt: 'asc' }, { id: 'asc' }] },
         delayReasons: { include: { category: true }, orderBy: { createdAt: 'desc' } },
         comments: { orderBy: { createdAt: 'asc' } },
+        signalOverrides: { select: { commentId: true } },
+        dismissal: true,
+        attachments: { orderBy: { name: 'asc' } },
       },
     });
     // Same 404 for "missing" and "in another project" prevents cross-project id probing.
@@ -124,25 +140,40 @@ export class WorkItemsService {
     });
 
     const vis = await this.scope.personVisibility(user, projectId);
-    const people = await this.scope.peopleById([item.assignedToId, ...item.changes.map((c) => c.changedById)]);
+    const people = await this.scope.peopleById([
+      item.assignedToId,
+      ...item.changes.map((c) => c.changedById),
+    ]);
     const [summary] = await this.summaries(projectId, [item], user, vis);
     const iterations = await this.prisma.iteration.findMany({
       where: { projectId, startDate: { not: null }, finishDate: { not: null } },
     });
     const sprints = new Map<string, SprintWindow>(
-      iterations.map((it) => [it.path, { path: it.path, startDate: it.startDate!, finishDate: it.finishDate! }]),
+      iterations.map((it) => [
+        it.path,
+        { path: it.path, startDate: it.startDate!, finishDate: it.finishDate! },
+      ]),
     );
 
-    const timeInState = new Map<string, { state: string; category: StateCategory; hours: number }>();
+    const timeInState = new Map<
+      string,
+      { state: string; category: StateCategory; hours: number }
+    >();
     for (const s of item.segments) {
-      const t = timeInState.get(s.state) ?? { state: s.state, category: s.category as StateCategory, hours: 0 };
+      const t = timeInState.get(s.state) ?? {
+        state: s.state,
+        category: s.category as StateCategory,
+        hours: 0,
+      };
       t.hours += s.durationHours;
       timeInState.set(s.state, t);
     }
 
     const estimateHours = item.originalEstimate ?? item.initialRemaining;
     const ratio =
-      estimateHours && estimateHours > 0 && item.completedWork !== null ? item.completedWork / estimateHours : null;
+      estimateHours && estimateHours > 0 && item.completedWork !== null
+        ? item.completedWork / estimateHours
+        : null;
 
     return {
       ...summary!,
@@ -184,14 +215,77 @@ export class WorkItemsService {
       comments: item.comments.map((c) => ({
         id: c.commentId,
         author: this.scope.personRef(
-          c.authorId ? { id: c.authorId, displayName: c.authorName, uniqueName: c.authorUniqueName } : null,
+          c.authorId
+            ? { id: c.authorId, displayName: c.authorName, uniqueName: c.authorUniqueName }
+            : null,
           vis,
         ),
         createdAt: c.createdAt.toISOString(),
         text: c.text,
         signals: c.signals as CommentSignal[],
+        ignored: item.signalOverrides.some((o) => o.commentId === c.commentId),
       })),
       commentDelayDays: round(item.commentDelayHours / 24)!,
+      dismissal: item.dismissal
+        ? {
+            reason: item.dismissal.reason,
+            by: item.dismissal.dismissedByName,
+            at: item.dismissal.createdAt.toISOString(),
+          }
+        : null,
+      attachments: item.attachments.map((a) => ({
+        name: a.name,
+        url: a.url,
+        sizeBytes: a.sizeBytes,
+      })),
     };
+  }
+
+  /** Marks (or un-marks) a tagged comment as not a real signal, then re-scores the project. */
+  async setCommentIgnored(
+    projectId: string,
+    id: number,
+    commentId: number,
+    ignored: boolean,
+    user: SessionUser,
+  ) {
+    await this.assertExists(projectId, id);
+    if (ignored) {
+      await this.prisma.commentSignalOverride.upsert({
+        where: { workItemId_commentId: { workItemId: id, commentId } },
+        create: {
+          workItemId: id,
+          commentId,
+          projectId,
+          ignoredById: user.id,
+          ignoredByName: user.displayName,
+        },
+        update: {},
+      });
+    } else {
+      await this.prisma.commentSignalOverride.deleteMany({ where: { workItemId: id, commentId } });
+    }
+    await this.processor.recomputeDelays(projectId);
+  }
+
+  /** Records (or clears) the team's call that the item wasn't really late. */
+  async setDismissal(projectId: string, id: number, reason: string | null, user: SessionUser) {
+    await this.assertExists(projectId, id);
+    if (reason) {
+      const data = { reason, dismissedById: user.id, dismissedByName: user.displayName };
+      await this.prisma.delayDismissal.upsert({
+        where: { workItemId: id },
+        create: { workItemId: id, projectId, ...data },
+        update: data,
+      });
+    } else {
+      await this.prisma.delayDismissal.deleteMany({ where: { workItemId: id } });
+    }
+    await this.processor.recomputeDelays(projectId);
+  }
+
+  private async assertExists(projectId: string, id: number) {
+    const found = await this.prisma.workItem.count({ where: { id, projectId, isDeleted: false } });
+    if (!found) throw new NotFoundException('Work item not found');
   }
 }

@@ -1,6 +1,18 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  dismissDelayBody,
   workItemId,
+  type DismissDelayBody,
   workItemListQuery,
   type Paged,
   type WorkItemDetail,
@@ -34,5 +46,50 @@ export class WorkItemsController {
     @CurrentUser() user: SessionUser,
   ): Promise<WorkItemDetail> {
     return this.items.detail(projectId, id, user);
+  }
+
+  /** "Not a blocker": the comment's tags stop counting. */
+  @Put(':id/comments/:commentId/ignore')
+  @HttpCode(204)
+  ignoreComment(
+    @Param('projectId') projectId: string,
+    @Param('id', new ZodPipe(workItemId)) id: number,
+    @Param('commentId', new ZodPipe(workItemId)) commentId: number,
+    @CurrentUser() user: SessionUser,
+  ): Promise<void> {
+    return this.items.setCommentIgnored(projectId, id, commentId, true, user);
+  }
+
+  @Delete(':id/comments/:commentId/ignore')
+  @HttpCode(204)
+  unignoreComment(
+    @Param('projectId') projectId: string,
+    @Param('id', new ZodPipe(workItemId)) id: number,
+    @Param('commentId', new ZodPipe(workItemId)) commentId: number,
+    @CurrentUser() user: SessionUser,
+  ): Promise<void> {
+    return this.items.setCommentIgnored(projectId, id, commentId, false, user);
+  }
+
+  /** "Not really late": keeps the flags but leaves the late count. */
+  @Put(':id/dismissal')
+  @HttpCode(204)
+  dismiss(
+    @Param('projectId') projectId: string,
+    @Param('id', new ZodPipe(workItemId)) id: number,
+    @Body(new ZodPipe(dismissDelayBody)) body: DismissDelayBody,
+    @CurrentUser() user: SessionUser,
+  ): Promise<void> {
+    return this.items.setDismissal(projectId, id, body.reason, user);
+  }
+
+  @Delete(':id/dismissal')
+  @HttpCode(204)
+  undismiss(
+    @Param('projectId') projectId: string,
+    @Param('id', new ZodPipe(workItemId)) id: number,
+    @CurrentUser() user: SessionUser,
+  ): Promise<void> {
+    return this.items.setDismissal(projectId, id, null, user);
   }
 }

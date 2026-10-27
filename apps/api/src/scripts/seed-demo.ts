@@ -200,12 +200,12 @@ async function seedComments(prisma: PrismaService, now: Date) {
     };
     add(author, start + 0.2 * DAY_MS, pick(['Started on the first round of mockups.', 'Picking this up today.', 'Kicked off, sharing early sketches soon.']));
     if (item.reopenCount > 0 || chance(0.15)) {
-      add(reviewer, start + 2 * DAY_MS, pick(['Reopening this, the spacing on mobile is off.', 'Sent back for changes: the empty state copy is missing.', 'Needs rework, the contrast fails on the secondary button.']));
+      add(reviewer, start + 2 * DAY_MS, pick(['#reopen the spacing on mobile is off.', '#sentback the empty state copy is missing.', '#reopen the contrast fails on the secondary button.']));
     }
     if (chance(0.2)) {
       const at = start + between(1, 3) * DAY_MS;
-      add(author, at, pick(['Blocked: waiting on copy from marketing.', 'On hold until the API contract is agreed.', 'Waiting for the brand team to approve the illustrations.']));
-      if (chance(0.6)) add(author, at + between(1, 4) * DAY_MS, pick(['Unblocked now, copy arrived.', 'No longer blocked, contract signed off.']));
+      add(author, at, pick(['#blocked waiting on copy from marketing.', '#blocked until the API contract is agreed.', 'Waiting for the brand team to approve the illustrations.']));
+      if (chance(0.6)) add(author, at + between(1, 4) * DAY_MS, pick(['#unblocked copy arrived.', '#unblocked contract signed off.']));
     }
     if (item.completedDate) {
       // Most hand-offs carry the Figma file; a few don't, so the page's "no link" state shows too.
@@ -214,14 +214,31 @@ async function seedComments(prisma: PrismaService, now: Date) {
         author,
         end - 0.2 * DAY_MS,
         chance(0.85)
-          ? pick([`Completed and handed off to dev. Final design: ${file}`, `Done, final files are in Figma: ${file}`, `Design signed off by the PM. ${file}`])
+          ? pick([`#done handed off to dev. Final design: ${file}`, `#done final files are in Figma: ${file}`, `Design signed off by the PM. ${file}`])
           : 'Design signed off by the PM.',
       );
     } else if (chance(0.12)) {
-      add(author, now.getTime() - between(3, 6) * DAY_MS, 'Design is done, ready for dev.');
+      add(author, now.getTime() - between(3, 6) * DAY_MS, '#done ready for dev.');
     }
   }
   await prisma.workItemComment.createMany({ data: rows });
+
+  // A brief and a screenshot or two on most items, as designers attach them in Azure DevOps.
+  const files: Prisma.WorkItemAttachmentCreateManyInput[] = [];
+  const org = 'https://dev.azure.com/contoso/Team%202/_apis/wit/attachments';
+  for (const item of items) {
+    if (!chance(0.7)) continue;
+    const names = ['brief.pdf', 'current-flow.png', 'research-notes.docx', 'copy-deck.xlsx'].filter(() => chance(0.5));
+    for (const name of names.length ? names : ['brief.pdf']) {
+      files.push({
+        workItemId: item.id,
+        name,
+        url: `${org}/${item.id}-${name}?fileName=${name}`,
+        sizeBytes: Math.round(between(40, 2400)) * 1024,
+      });
+    }
+  }
+  await prisma.workItemAttachment.createMany({ data: files });
 }
 
 async function main() {

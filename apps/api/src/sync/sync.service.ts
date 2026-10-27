@@ -405,8 +405,23 @@ export class SyncService {
       for (const id of outside) touched.delete(id);
     }
     // Adding a comment creates a revision, so the touched items are exactly the ones to refresh.
-    for (const id of touched) await this.syncComments(projectId, id);
+    for (const id of touched) {
+      await this.syncComments(projectId, id);
+      await this.syncAttachments(projectId, id);
+    }
     return { items: touched.size, revisions };
+  }
+
+  /** Replaces an item's stored attachment links with the current Azure DevOps ones. */
+  private async syncAttachments(projectId: string, workItemId: number) {
+    const files = await this.ado.listAttachments(projectId, workItemId);
+    await this.prisma.$transaction([
+      this.prisma.workItemAttachment.deleteMany({ where: { workItemId } }),
+      this.prisma.workItemAttachment.createMany({
+        data: files.map((f) => ({ workItemId, ...f })),
+        skipDuplicates: true,
+      }),
+    ]);
   }
 
   /** Replaces an item's stored comments with the current Azure DevOps discussion. */

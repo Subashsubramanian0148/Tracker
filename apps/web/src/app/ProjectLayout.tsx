@@ -65,7 +65,7 @@ function ProjectScope({ projectId }: { projectId: string }) {
   const base = `/projects/${encodeURIComponent(projectId)}`;
   const tabs: HeaderTab[] = [
     { to: `${base}/overview`, label: 'Overview' },
-    { to: `${base}/board`, label: 'Board' },
+    { to: `${base}/board`, label: 'Board', alsoActive: `${base}/work-items` },
     { to: `${base}/sprints`, label: 'Sprints' },
     { to: `${base}/delays`, label: 'Delays' },
   ];

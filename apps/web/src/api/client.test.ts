@@ -35,7 +35,9 @@ describe('api client', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
     setCsrfToken('tok-123');
 
-    await expect(api.get('/projects', { page: 2, search: undefined, teamId: '' })).resolves.toEqual({ ok: true });
+    await expect(api.get('/projects', { page: 2, search: undefined, teamId: '' })).resolves.toEqual(
+      { ok: true },
+    );
 
     const call = fetchMock.mock.calls[0] ?? [];
     expect(call[0]).toBe('/api/projects?page=2');
@@ -62,7 +64,9 @@ describe('api client', () => {
 
   it('fetches the CSRF token from /auth/me when it is not cached yet', async () => {
     fetchMock
-      .mockResolvedValueOnce(jsonResponse({ csrfToken: 'fresh', user: {}, projects: [], authMode: 'dev' }))
+      .mockResolvedValueOnce(
+        jsonResponse({ csrfToken: 'fresh', user: {}, projects: [], authMode: 'dev' }),
+      )
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
 
     await api.put('/admin/delay-categories/1', { name: 'x' });
@@ -100,7 +104,11 @@ describe('api client', () => {
 
   it('falls back gracefully for non-JSON errors and reads Retry-After', async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response('slow down', { status: 429, statusText: '', headers: { 'Retry-After': '12', 'Content-Type': 'text/plain' } }),
+      new Response('slow down', {
+        status: 429,
+        statusText: '',
+        headers: { 'Retry-After': '12', 'Content-Type': 'text/plain' },
+      }),
     );
     const e = (await api.get('/x').catch((x: unknown) => x)) as ApiError;
     expect(e).toBeInstanceOf(ApiError);
@@ -119,14 +127,18 @@ describe('api client', () => {
   it('redirects to login with an encoded, same-origin returnTo on 401', async () => {
     window.history.replaceState(null, '', '/projects/abc/board?x=1#top');
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ type: 'about:blank', title: 'Unauthorized', status: 401, traceId: 't1' }, { status: 401 }, 'application/problem+json'),
+      jsonResponse(
+        { type: 'about:blank', title: 'Unauthorized', status: 401, traceId: 't1' },
+        { status: 401 },
+        'application/problem+json',
+      ),
     );
 
     const e = (await api.get('/projects').catch((x: unknown) => x)) as ApiError;
 
     expect(e.status).toBe(401);
     expect(assignMock).toHaveBeenCalledWith(
-      `/api/auth/login?returnTo=${encodeURIComponent('/projects/abc/board?x=1#top')}`,
+      `/signin?returnTo=${encodeURIComponent('/projects/abc/board?x=1#top')}`,
     );
   });
 });
@@ -147,6 +159,8 @@ describe('safeReturnTo', () => {
 
 describe('apiUrl', () => {
   it('drops empty params and encodes values', () => {
-    expect(apiUrl('/w', { a: 'x y', b: undefined, c: null, d: '', e: false })).toBe('/api/w?a=x+y&e=false');
+    expect(apiUrl('/w', { a: 'x y', b: undefined, c: null, d: '', e: false })).toBe(
+      '/api/w?a=x+y&e=false',
+    );
   });
 });

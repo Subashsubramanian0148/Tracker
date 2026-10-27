@@ -11,7 +11,6 @@ import {
 } from '@/components/shadcn/sheet';
 import { Avatar } from '../../components/ui/Avatar';
 import { SegmentedControl } from '../../components/ui/SegmentedControl';
-import { Select } from '../../components/ui/Select';
 import { formatNumber, typeShortCode } from '../../lib/format';
 import { delayFlagLabel } from '../../lib/labels';
 
@@ -119,22 +118,12 @@ function Detail({
         <SheetDescription>{COPY[kind].description}</SheetDescription>
         {groups.length > 0 ? (
           <div className="pt-3">
-            {groups.length <= 3 ? (
-              <SegmentedControl
-                label="Show"
-                value={group!.key}
-                onChange={setGroupKey}
-                options={options}
-              />
-            ) : (
-              <Select
-                label="Show"
-                hideLabel
-                value={group!.key}
-                onChange={setGroupKey}
-                options={options}
-              />
-            )}
+            <SegmentedControl
+              label="Show"
+              value={group!.key}
+              onChange={setGroupKey}
+              options={options}
+            />
           </div>
         ) : null}
       </SheetHeader>

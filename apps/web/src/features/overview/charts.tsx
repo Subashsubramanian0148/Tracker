@@ -21,7 +21,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { formatDate, formatDays, formatShortDate } from '../../lib/format';
 
 // Validated categorical slots (see styles tokens --color-series-*), fixed order.
-const SERIES = ['#c8431e', '#2a78d6', '#1baf7a'] as const;
+const SERIES = ['#BA141A', '#2a78d6', '#1baf7a'] as const;
 const AXIS = { fontSize: 12, fill: '#6b6b6b' };
 const GRID = '#ececec';
 
@@ -93,7 +93,7 @@ export function CycleTimeScatter({
           ? 'No items completed in this range.'
           : `${count} items finished. Typical time: ${formatDays(median)} | Safe timeline: ${formatDays(p85)}.`
       }
-      table={{ columns: ['Work item', 'Type', 'Completed', 'Cycle time'], rows }}
+      table={{ columns: ['Work item', 'Type', 'Completed', 'Time spent working'], rows }}
       legend={
         <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1">
           {GROUP_LABELS.map((l, i) => (

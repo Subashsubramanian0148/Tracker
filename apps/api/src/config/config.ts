@@ -31,6 +31,12 @@ const envSchema = z
     SESSION_IDLE_MINUTES: z.coerce.number().int().min(5).max(240).default(30),
     SESSION_ABSOLUTE_HOURS: z.coerce.number().int().min(1).max(24).default(8),
 
+    /** Company email domains allowed to sign in, e.g. "cspl.com". Empty = any account in the tenant. */
+    ALLOWED_EMAIL_DOMAINS: csv
+      .transform((d) => d.map((x) => x.toLowerCase().replace(/^@/, '')))
+      .default([]),
+    /** Emails allowed into Admin (sync, categories, audit log). Everyone else: their own projects. */
+    ADMIN_EMAILS: csv.transform((d) => d.map((x) => x.toLowerCase())).default([]),
     AUTH_MODE: z.enum(['entra', 'dev']).default('entra'),
     ENTRA_TENANT_ID: z.guid().optional(),
     ENTRA_CLIENT_ID: z.guid().optional(),
@@ -68,7 +74,7 @@ const envSchema = z
 
     if (isProd && env.AUTH_MODE === 'dev')
       issue('AUTH_MODE', 'dev auth is not allowed in production');
-    // Dev sign-in lets anyone pick a persona, so it only ever runs on this machine, whatever
+    // Dev sign-in needs no password, so it only ever runs on this machine, whatever
     // NODE_ENV says (a forgotten NODE_ENV must not expose it on a real host).
     if (
       env.AUTH_MODE === 'dev' &&

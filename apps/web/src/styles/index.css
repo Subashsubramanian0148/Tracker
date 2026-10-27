@@ -12,32 +12,32 @@
   --card-foreground: #171717;
   --popover: #ffffff;
   --popover-foreground: #171717;
-  --primary: #c8431e;
+  --primary: #BA141A;
   --primary-foreground: #fffaf7;
   --secondary: #f1ece9;
   --secondary-foreground: #222222;
   --muted: #f7f3f1;
   --muted-foreground: #57534e;
-  --accent: #fde4da;
-  --accent-foreground: #5c1d0b;
+  --accent: #FBE3E4;
+  --accent-foreground: #5E0A0D;
   --destructive: #b42318;
   --destructive-foreground: #fafafa;
   --border: #ebe5e1;
   --input: #f1ece9;
-  --ring: #e4572e;
-  --chart-1: #fde4da;
-  --chart-2: #f6a68c;
-  --chart-3: #e4572e;
-  --chart-4: #c8431e;
+  --ring: #D62B31;
+  --chart-1: #FBE3E4;
+  --chart-2: #F2A1A4;
+  --chart-3: #D62B31;
+  --chart-4: #BA141A;
   --chart-5: #7a2610;
   --sidebar: #fbf8f6;
   --sidebar-foreground: #171717;
-  --sidebar-primary: #c8431e;
+  --sidebar-primary: #BA141A;
   --sidebar-primary-foreground: #fffaf7;
-  --sidebar-accent: #fde4da;
-  --sidebar-accent-foreground: #5c1d0b;
+  --sidebar-accent: #FBE3E4;
+  --sidebar-accent-foreground: #5E0A0D;
   --sidebar-border: #ebe5e1;
-  --sidebar-ring: #e4572e;
+  --sidebar-ring: #D62B31;
   --radius: 0.5rem;
   --shadow-2xs: 0.25px 1px 3px 0px hsl(15 60% 20% / 0.07);
   --shadow-xs: 0.25px 1px 3px 0px hsl(15 60% 20% / 0.07);
@@ -64,19 +64,19 @@
   --secondary-foreground: #ebebeb;
   --muted: #1d1d1d;
   --muted-foreground: #a4a4a4;
-  --accent: #3a211a;
-  --accent-foreground: #fde4da;
+  --accent: #3A1A1C;
+  --accent-foreground: #FBE3E4;
   --destructive: #ff5b5b;
   --border: #242424;
   --input: #333333;
   --chart-1: #7a2610;
-  --chart-2: #c8431e;
-  --chart-4: #f6a68c;
-  --chart-5: #fde4da;
+  --chart-2: #BA141A;
+  --chart-4: #F2A1A4;
+  --chart-5: #FBE3E4;
   --sidebar: #000000;
   --sidebar-foreground: #ededed;
-  --sidebar-accent: #3a211a;
-  --sidebar-accent-foreground: #fde4da;
+  --sidebar-accent: #3A1A1C;
+  --sidebar-accent-foreground: #FBE3E4;
   --sidebar-border: #242424;
 }
 
@@ -177,7 +177,7 @@
   --color-col-removed: #a3a3a3;
 
   /* Chart series (validated categorical palette, fixed order). */
-  --color-series-1: #c8431e;
+  --color-series-1: #BA141A;
   --color-series-2: #2a78d6;
   --color-series-3: #1baf7a;
 
@@ -236,16 +236,16 @@
 
 /* Gradient-border pill (e.g. "Sync now", due pills): border painted by a padded wrapper. */
 @utility gradient-ring {
-  background-image: linear-gradient(90deg, #f6a68c, #e4572e 50%, #c8431e);
+  background-image: linear-gradient(90deg, #F2A1A4, #D62B31 50%, #BA141A);
 }
 @utility gradient-ring-due {
-  background-image: linear-gradient(90deg, #f6a68c, #e4572e);
+  background-image: linear-gradient(90deg, #F2A1A4, #D62B31);
 }
 @utility gradient-ring-user {
-  background-image: linear-gradient(90deg, #f6a68c, #e4572e);
+  background-image: linear-gradient(90deg, #F2A1A4, #D62B31);
 }
 @utility gradient-wash {
-  background-image: linear-gradient(135deg, #fde4da 0%, #f6a68c 60%, #e4572e 100%);
+  background-image: linear-gradient(135deg, #FBE3E4 0%, #F2A1A4 60%, #D62B31 100%);
 }
 @utility dark-sheen {
   background-image: linear-gradient(180deg, #2a2a2a 0%, #111111 55%, #050505 100%);

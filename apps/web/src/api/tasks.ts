@@ -1,4 +1,12 @@
-import type { CreateTaskBody, Paged, Task, TaskComment, TaskListQuery, TaskSummary, UpdateTaskBody } from '@ado-metrics/shared';
+import type {
+  CreateTaskBody,
+  Paged,
+  Task,
+  TaskComment,
+  TaskListQuery,
+  TaskSummary,
+  UpdateTaskBody,
+} from '@ado-metrics/shared';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, seg } from './client';
 import { qk } from './queryKeys';
@@ -37,7 +45,8 @@ export function useCreateTask() {
 export function useUpdateTask() {
   const invalidate = useInvalidateTasks();
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: UpdateTaskBody }) => api.patch<Task>(`/tasks/${seg(id)}`, body),
+    mutationFn: ({ id, body }: { id: string; body: UpdateTaskBody }) =>
+      api.patch<Task>(`/tasks/${seg(id)}`, body),
     onSuccess: invalidate,
   });
 }
@@ -53,7 +62,8 @@ export function useDeleteTask() {
 export function useTaskComments(taskId: string | undefined) {
   return useQuery({
     queryKey: qk.taskComments(taskId ?? ''),
-    queryFn: ({ signal }) => api.get<TaskComment[]>(`/tasks/${seg(taskId!)}/comments`, undefined, signal),
+    queryFn: ({ signal }) =>
+      api.get<TaskComment[]>(`/tasks/${seg(taskId!)}/comments`, undefined, signal),
     enabled: !!taskId,
   });
 }

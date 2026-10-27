@@ -72,7 +72,7 @@ describe('WorkItemCard', () => {
     expect(screen.getByText(/^Overdue 1[56] May$/)).toBeInTheDocument();
   });
 
-  it('shows cycle/lead for done items and never marks them overdue', () => {
+  it('shows working time for done items and never marks them overdue', () => {
     renderCard(
       item({
         stateCategory: 'Completed',
@@ -83,7 +83,7 @@ describe('WorkItemCard', () => {
       }),
       Date.parse('2026-06-20T12:00:00Z'),
     );
-    expect(screen.getByText(/Cycle 6.2d · Lead 11.0d/)).toBeInTheDocument();
+    expect(screen.getByText(/Worked 6 days · 11 days from request/)).toBeInTheDocument();
     expect(screen.queryByText(/Overdue/)).not.toBeInTheDocument();
   });
 });

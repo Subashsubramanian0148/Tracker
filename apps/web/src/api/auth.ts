@@ -37,11 +37,11 @@ export function useLogout() {
     onSuccess: (res) => {
       setCsrfToken(null);
       // Full navigation drops all cached data (single sign-out via Entra when configured).
-      navigation.assign(safeLogoutTarget(res?.logoutUrl));
+      navigation.assign(res?.logoutUrl ? safeLogoutTarget(res.logoutUrl) : '/signin?signedOut');
     },
     onError: () => {
       setCsrfToken(null);
-      navigation.assign('/');
+      navigation.assign('/signin?signedOut');
     },
   });
 }

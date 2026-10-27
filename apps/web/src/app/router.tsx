@@ -3,10 +3,12 @@ import { BOARD_ONLY, PROJECT_HOME, TASKS_ENABLED } from '../lib/features';
 import { AppRoot, ShellSkeleton } from './AppShell';
 import { ForbiddenPage, NotFoundPage, RouteError } from './ErrorPages';
 import { ProjectLayout } from './ProjectLayout';
+import { SignInPage } from '../features/auth/SignInPage';
 import { RootRedirect } from './RootRedirect';
 
 // Feature pages are code-split; charts (recharts) only load where used.
 export const router = createBrowserRouter([
+  { path: '/signin', element: <SignInPage /> },
   {
     path: '/',
     element: <AppRoot />,
@@ -17,6 +19,12 @@ export const router = createBrowserRouter([
         errorElement: <RouteError />,
         children: [
           { index: true, element: <RootRedirect /> },
+          {
+            path: 'welcome',
+            lazy: async () => ({
+              Component: (await import('../features/welcome/WelcomePage')).WelcomePage,
+            }),
+          },
           {
             path: 'dashboard',
             lazy: async () => ({

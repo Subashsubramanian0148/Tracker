@@ -151,7 +151,7 @@ export class MetricsService {
     });
 
     const cycleDays = completed.flatMap((c) =>
-      c.cycleTimeHours === null ? [] : [c.cycleTimeHours / 24],
+      !trustedCycle(c.cycleTimeHours) ? [] : [c.cycleTimeHours! / 24],
     );
     const leadDays = completed.flatMap((c) =>
       c.leadTimeHours === null ? [] : [c.leadTimeHours / 24],
@@ -268,7 +268,7 @@ export class MetricsService {
       leadTime: distribution(leadDays),
       throughput: [...weeks].map(([weekStart, count]) => ({ weekStart, count })),
       cycleTimeScatter: completed
-        .filter((c) => c.cycleTimeHours !== null)
+        .filter((c) => trustedCycle(c.cycleTimeHours))
         .map((c) => ({
           workItemId: c.id,
           title: c.title,
@@ -464,7 +464,7 @@ export class MetricsService {
           completedCount: done.length,
           activeCount: items.length - done.length,
           cycleTime: distribution(
-            done.flatMap((i) => (i.cycleTimeHours === null ? [] : [i.cycleTimeHours / 24])),
+            done.flatMap((i) => (!trustedCycle(i.cycleTimeHours) ? [] : [i.cycleTimeHours! / 24])),
           ),
           delayedCount: items.filter((i) => i.isDelayed).length,
           estimateAccuracyRatio: ratios.length
@@ -481,4 +481,12 @@ function timeFrame(start: Date | null, finish: Date | null, now: number): Iterat
   if (finish.getTime() + DAY_MS < now) return 'past';
   if (start.getTime() > now) return 'future';
   return 'current';
+}
+
+/**
+ * Under an hour of working time means the card skipped "in progress" (moved straight to Done), so
+ * its cycle time says nothing about the work. Those items stay out of averages.
+ */
+function trustedCycle(hours: number | null): boolean {
+  return hours !== null && hours >= 1;
 }

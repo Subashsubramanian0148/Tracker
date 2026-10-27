@@ -14,6 +14,14 @@ export function formatDays(days: number | null | undefined, digits = 1): string 
   return `${days.toFixed(digits)}d`;
 }
 
+/** Whole days in words ("6 days"), for labels read by people who don't know the shorthand. */
+export function formatWholeDays(days: number | null | undefined): string {
+  if (days === null || days === undefined || !Number.isFinite(days)) return DASH;
+  const n = Math.round(days);
+  if (n === 0) return 'under a day';
+  return `${n} ${n === 1 ? 'day' : 'days'}`;
+}
+
 /** Hours rendered compactly: < 1h → "<1h", < 48h → "5.5h", else in days. */
 export function formatHours(hours: number | null | undefined): string {
   if (hours === null || hours === undefined || !Number.isFinite(hours)) return DASH;

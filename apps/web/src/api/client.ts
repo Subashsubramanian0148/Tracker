@@ -87,7 +87,7 @@ export const navigation = {
 export function redirectToLogin(): void {
   const { pathname, search, hash } = window.location;
   const returnTo = safeReturnTo(`${pathname}${search}${hash}`);
-  navigation.assign(`/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
+  navigation.assign(`/signin?returnTo=${encodeURIComponent(returnTo)}`);
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -105,7 +105,8 @@ function parseFieldErrors(v: unknown): FieldError[] {
 
 async function toApiError(res: Response): Promise<ApiError> {
   const retryHeader = res.headers.get('Retry-After');
-  const retryAfterSeconds = retryHeader && /^\d+$/.test(retryHeader) ? Number(retryHeader) : undefined;
+  const retryAfterSeconds =
+    retryHeader && /^\d+$/.test(retryHeader) ? Number(retryHeader) : undefined;
   const fallback = {
     status: res.status,
     title: res.statusText || defaultTitle(res.status),
@@ -161,7 +162,11 @@ export interface RequestOptions {
   signal?: AbortSignal;
 }
 
-export async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
+export async function request<T>(
+  method: string,
+  path: string,
+  opts: RequestOptions = {},
+): Promise<T> {
   const upper = method.toUpperCase();
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (MUTATING.has(upper)) {

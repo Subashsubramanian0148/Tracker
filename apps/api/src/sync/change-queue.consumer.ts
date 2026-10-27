@@ -2,7 +2,13 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { ManagedIdentityCredential, type TokenCredential } from '@azure/identity';
 import { ServiceBusClient, type ServiceBusReceiver } from '@azure/service-bus';
 import { QueueClient } from '@azure/storage-queue';
-import { Inject, Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+  OnApplicationShutdown,
+} from '@nestjs/common';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { projectIdFromServiceHook } from './service-hook';
 import { SyncScheduler } from './sync.scheduler';
@@ -84,7 +90,8 @@ export class ChangeQueueConsumer implements OnApplicationBootstrap, OnApplicatio
           this.handle(msg.messageText);
           await queue.deleteMessage(msg.messageId, msg.popReceipt);
         }
-        if (receivedMessageItems.length === 0) await sleep(IDLE_POLL_MS, undefined, { signal: this.abort.signal });
+        if (receivedMessageItems.length === 0)
+          await sleep(IDLE_POLL_MS, undefined, { signal: this.abort.signal });
       } catch (err) {
         if (this.abort.signal.aborted) return;
         await this.backOff(err);
@@ -111,7 +118,12 @@ export class ChangeQueueConsumer implements OnApplicationBootstrap, OnApplicatio
 export function parseServiceBusUrl(url: string): { host: string; queue: string } {
   const u = new URL(url);
   const queue = decodeURIComponent(u.pathname.replace(/^\/+|\/+$/g, ''));
-  if (u.protocol !== 'https:' || !u.hostname.endsWith('.servicebus.windows.net') || !queue || queue.includes('/')) {
+  if (
+    u.protocol !== 'https:' ||
+    !u.hostname.endsWith('.servicebus.windows.net') ||
+    !queue ||
+    queue.includes('/')
+  ) {
     throw new Error('CHANGE_QUEUE_URL must be https://<namespace>.servicebus.windows.net/<queue>');
   }
   return { host: u.hostname, queue };
@@ -120,7 +132,8 @@ export function parseServiceBusUrl(url: string): { host: string; queue: string }
 /** Service Bus bodies arrive decoded as an object, a string or raw bytes depending on the sender. */
 export function bodyText(body: unknown): string | null {
   if (typeof body === 'string') return body;
-  if (Buffer.isBuffer(body) || body instanceof Uint8Array) return Buffer.from(body).toString('utf8');
+  if (Buffer.isBuffer(body) || body instanceof Uint8Array)
+    return Buffer.from(body).toString('utf8');
   if (body !== null && typeof body === 'object') {
     try {
       return JSON.stringify(body);

@@ -8,8 +8,12 @@ export function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 60_000,
-        refetchOnWindowFocus: false,
+        // Live view: pick up Azure DevOps changes without a manual reload. Polling pauses
+        // while the tab is hidden, and returning to the tab refreshes straight away.
+        staleTime: 15_000,
+        refetchInterval: 30_000,
+        refetchIntervalInBackground: false,
+        refetchOnWindowFocus: true,
         // Retry transient failures only (network, 5xx, 429), never auth/validation errors.
         retry: (count, error) => {
           if (

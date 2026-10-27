@@ -40,7 +40,9 @@ export class AdminSyncController {
   ) {}
 
   @Get('sync-runs')
-  list(@Query(new ZodPipe(paginationQuery)) q: { page: number; pageSize: number }): Promise<Paged<SyncRun>> {
+  list(
+    @Query(new ZodPipe(paginationQuery)) q: { page: number; pageSize: number },
+  ): Promise<Paged<SyncRun>> {
     return this.sync.listRuns(q.page, q.pageSize);
   }
 
@@ -52,7 +54,8 @@ export class AdminSyncController {
     @CurrentUser() user: SessionUser,
     @Req() req: Request,
   ): Promise<SyncRun> {
-    if (this.config.SYNC_DISABLED) throw new ConflictException('Sync is disabled in this environment');
+    if (this.config.SYNC_DISABLED)
+      throw new ConflictException('Sync is disabled in this environment');
     const started = await this.sync.start('manual', body);
     await this.audit.record({
       action: 'sync.trigger',

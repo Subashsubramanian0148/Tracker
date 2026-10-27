@@ -4,14 +4,14 @@ const at = (day: number) => new Date(Date.UTC(2026, 9, day));
 
 describe('commentSignals', () => {
   it.each([
-    ['Reopening this, the spacing is off', ['REOPEN']],
-    ['Sent back for changes', ['REOPEN']],
-    ['Blocked: waiting on copy from marketing', ['BLOCKED']],
-    ['Completed and handed off to dev', ['DONE']],
-    ['Mockups are done', ['DONE']],
-    ['Not done yet, still polishing', ['REOPEN']],
-    ['Unblocked now, copy arrived', ['UNBLOCKED']],
-    ['No longer blocked', ['UNBLOCKED']],
+    ['#reopen the spacing is off', ['REOPEN']],
+    ['#sentback for changes', ['REOPEN']],
+    ['#blocked waiting on copy from marketing', ['BLOCKED']],
+    ['Handed off to dev #done', ['DONE']],
+    ['#unblocked copy arrived', ['UNBLOCKED']],
+    ["I'm done for today, will continue tomorrow", []],
+    ['Not blocked by anything', []],
+    ['See issue#done-ish', []],
     ['Looks good to me', []],
   ])('%s', (text, expected) => {
     expect(commentSignals(text)).toEqual(expected);
@@ -50,8 +50,7 @@ describe('commentDelay', () => {
     expect(r.flags).toEqual(['REOPENED_IN_COMMENTS']);
   });
 
-  it('flags work said to be done but still open after two days', () => {
-    expect(commentDelay([{ createdAt: at(1), signals: ['DONE'] }], open, at(4)).flags).toEqual(['DONE_NOT_CLOSED']);
-    expect(commentDelay([{ createdAt: at(1), signals: ['DONE'] }], open, at(2)).flags).toEqual([]);
+  it('no longer treats a done comment on an open item as a delay', () => {
+    expect(commentDelay([{ createdAt: at(1), signals: ['DONE'] }], open, at(4)).flags).toEqual([]);
   });
 });

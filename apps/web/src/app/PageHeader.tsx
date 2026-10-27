@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
-import { NavLink } from 'react-router';
+import { NavLink, useLocation } from 'react-router';
 import { DiamondMark } from '../components/ui/icons';
 import { HeaderActions } from './TopBar';
 
@@ -8,6 +8,8 @@ export interface HeaderTab {
   to: string;
   label: string;
   end?: boolean;
+  /** Other path prefixes that also select this tab (e.g. a work item opened from the board). */
+  alsoActive?: string;
 }
 
 interface PageHeaderProps {
@@ -28,6 +30,8 @@ export function PageHeader({
   tabsLabel = 'Sections',
   icon,
 }: PageHeaderProps) {
+  const { pathname } = useLocation();
+  const inSection = (t: HeaderTab) => Boolean(t.alsoActive && pathname.startsWith(t.alsoActive));
   return (
     <header className="border-b border-line pb-0">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -62,7 +66,7 @@ export function PageHeader({
                     className={({ isActive }) =>
                       clsx(
                         'inline-flex items-center gap-1.5 border-b-2 px-3 pt-1 pb-3 font-display text-sm font-medium whitespace-nowrap transition-colors',
-                        isActive
+                        isActive || inSection(t)
                           ? 'border-ink text-ink'
                           : 'border-transparent text-muted-foreground hover:text-ink',
                       )
@@ -71,8 +75,8 @@ export function PageHeader({
                     {({ isActive }) => (
                       <>
                         <DiamondMark
-                          filled={isActive}
-                          className={isActive ? 'text-ink' : 'text-faint'}
+                          filled={isActive || inSection(t)}
+                          className={isActive || inSection(t) ? 'text-ink' : 'text-faint'}
                         />
                         {t.label}
                       </>

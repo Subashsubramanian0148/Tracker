@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Folder,
   LayoutGrid,
+  Rocket,
   ListTodo,
   LogOut,
   ChevronDown,
@@ -142,14 +143,19 @@ export function Sidebar({
               </SideLink>
             </>
           ) : (
-            <SideLink
-              to="/dashboard"
-              icon={LayoutGrid}
-              collapsed={collapsed}
-              onNavigate={onNavigate}
-            >
-              Dashboard
-            </SideLink>
+            <>
+              <SideLink to="/welcome" icon={Rocket} collapsed={collapsed} onNavigate={onNavigate}>
+                Get started
+              </SideLink>
+              <SideLink
+                to="/dashboard"
+                icon={LayoutGrid}
+                collapsed={collapsed}
+                onNavigate={onNavigate}
+              >
+                Dashboard
+              </SideLink>
+            </>
           )}
 
           {mode === 'metrics' ? (
@@ -285,13 +291,21 @@ function ProjectGroup({
   showPeople: boolean;
   onNavigate?: () => void;
 }) {
+  const { pathname } = useLocation();
   const base = `/projects/${encodeURIComponent(project.id)}`;
   const listId = `proj-nav-${project.id}`;
-  const children: { to: string; label: string; count?: string; countLabel?: string }[] = [
+  const children: {
+    to: string;
+    label: string;
+    count?: string;
+    countLabel?: string;
+    alsoActive?: string;
+  }[] = [
     { to: `${base}/overview`, label: 'Overview' },
     {
       to: `${base}/board`,
       label: 'Board',
+      alsoActive: `${base}/work-items`,
       count: summary?.workItemCount ? formatCompact(summary.workItemCount) : undefined,
       countLabel: `${summary?.workItemCount ?? 0} work items`,
     },
@@ -339,7 +353,9 @@ function ProjectGroup({
                 className={({ isActive }) =>
                   clsx(
                     'flex h-9 items-center justify-between gap-2 rounded-lg px-3 text-sm transition-colors',
-                    isActive ? ITEM_ACTIVE : ITEM_IDLE,
+                    isActive || (c.alsoActive && pathname.startsWith(c.alsoActive))
+                      ? ITEM_ACTIVE
+                      : ITEM_IDLE,
                   )
                 }
               >
@@ -368,7 +384,9 @@ function UserRow({ collapsed }: { collapsed: boolean }) {
     <Popover label="Account" role="menu" align="start" trigger={trigger}>
       {() => (
         <>
-          <p className="truncate px-3 py-2 text-xs text-muted-foreground">{user.email}</p>
+          <p className="truncate px-3 py-2 text-xs text-muted-foreground">
+            {user.jobTitle ?? user.email}
+          </p>
           <button
             type="button"
             role="menuitem"

@@ -6,8 +6,8 @@ import { Link } from 'react-router';
 import { Avatar } from '../../components/ui/Avatar';
 import {
   daysBetween,
-  formatDays,
   formatShortDate,
+  formatWholeDays,
   isOverdue,
   typeShortCode,
 } from '../../lib/format';
@@ -21,7 +21,7 @@ interface WorkItemCardProps {
 
 function secondaryLine(item: WorkItemSummary, now: number): string {
   if (item.stateCategory === 'Completed') {
-    return `Cycle ${formatDays(item.cycleTimeDays)} · Lead ${formatDays(item.leadTimeDays)}`;
+    return `Worked ${formatWholeDays(item.cycleTimeDays)} · ${formatWholeDays(item.leadTimeDays)} from request`;
   }
   // The column already shows the state, so only say how long it has been there.
   if (item.activatedDate) {

@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { ConfidentialClientApplication, CryptoProvider, LogLevel } from '@azure/msal-node';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ROLES, type Role } from '@ado-metrics/shared';
+import { type Role } from '@ado-metrics/shared';
 import { AdoClient, ADO_RESOURCE } from '../ado/ado.client';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { safeEqual } from '../common/guards';
@@ -15,7 +15,8 @@ const LOGIN_TTL_MS = 10 * 60_000;
 export class SignInError extends Error {
   constructor(
     message: string,
-    public readonly reason: 'invalid_state' | 'expired' | 'idp_error' | 'invalid_token' | 'no_role',
+    public readonly reason:
+      'invalid_state' | 'expired' | 'idp_error' | 'invalid_token' | 'not_member',
   ) {
     super(message);
   }
@@ -112,15 +113,21 @@ export class AuthService {
     const oid = typeof claims.oid === 'string' ? claims.oid : null;
     if (!oid) throw new SignInError('ID token has no oid', 'invalid_token');
 
-    const roles = (Array.isArray(claims.roles) ? claims.roles : []).filter((r): r is Role =>
-      (ROLES as readonly unknown[]).includes(r),
-    );
-    // There is no separate Admin level any more: an Entra 'Admin' assignment signs in as Manager.
-    const normalised = [...new Set(roles.map((r): Role => (r === 'Admin' ? 'Manager' : r)))];
-    roles.splice(0, roles.length, ...normalised);
-    if (roles.length === 0) throw new SignInError('No application role assigned', 'no_role');
+    // Internal site: only the company's own accounts. Guests invited into the tenant from other
+    // organisations (B2B) pass the tenant check above, so they are turned away here.
+    const upn = String(claims.preferred_username ?? claims.email ?? '').toLowerCase();
+    const isGuest = claims.acct === 1 || upn.includes('#ext#') || typeof claims.idp === 'string';
+    const domain = upn.split('@')[1] ?? '';
+    const domains = this.config.ALLOWED_EMAIL_DOMAINS;
+    if (isGuest || (domains.length > 0 && !domains.includes(domain))) {
+      throw new SignInError('Not a company account', 'not_member');
+    }
 
-    const email = String(claims.preferred_username ?? claims.email ?? '').toLowerCase();
+    // Everyone gets the full view of the projects they can open in Azure DevOps (TeamLead).
+    // Admin (sync, categories, audit, every project) is limited to ADMIN_EMAILS.
+    const roles: Role[] = this.config.ADMIN_EMAILS.includes(upn) ? ['Admin'] : ['TeamLead'];
+
+    const email = upn;
     const user: SessionUser = {
       id: oid,
       displayName: String(claims.name ?? email).slice(0, 200),
@@ -154,7 +161,10 @@ export class AuthService {
     const url = new URL(
       `https://login.microsoftonline.com/${this.config.ENTRA_TENANT_ID}/oauth2/v2.0/logout`,
     );
-    url.searchParams.set('post_logout_redirect_uri', this.config.publicOrigin);
+    url.searchParams.set(
+      'post_logout_redirect_uri',
+      `${this.config.publicOrigin}/signin?signedOut`,
+    );
     return url.toString();
   }
 }

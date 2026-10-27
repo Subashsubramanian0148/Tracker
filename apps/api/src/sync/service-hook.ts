@@ -6,9 +6,7 @@ import { z } from 'zod';
  */
 export const serviceHookPayload = z.object({
   eventType: z.string().max(100),
-  resourceContainers: z
-    .object({ project: z.object({ id: z.guid() }).optional() })
-    .optional(),
+  resourceContainers: z.object({ project: z.object({ id: z.guid() }).optional() }).optional(),
 });
 
 /** Returns the project id for work item events, or null for anything else. */

@@ -18,7 +18,7 @@ import { Public } from '../common/decorators';
 import type { SessionUser } from '../common/session.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService, randomToken, safeReturnTo, SignInError } from './auth.service';
-import { DEV_PERSONAS } from './dev-personas';
+import { DEV_USER } from './dev-personas';
 import { PAGE_CSS } from './page-css';
 import { isManager } from '../common/guards';
 
@@ -80,19 +80,19 @@ export class AuthController {
       const reason = err instanceof SignInError ? err.reason : 'idp_error';
       await this.audit.record({
         action: 'auth.login',
-        outcome: reason === 'no_role' ? 'denied' : 'error',
+        outcome: reason === 'not_member' ? 'denied' : 'error',
         req,
         details: { reason },
       });
       req.session.pendingLogin = undefined;
       res
-        .status(reason === 'no_role' ? 403 : 401)
+        .status(reason === 'not_member' ? 403 : 401)
         .type('html')
         .send(
-          reason === 'no_role'
+          reason === 'not_member'
             ? page(
-                'No access',
-                'Your account has no role in DesignFlow. Ask an administrator to assign you a role.',
+                'Company accounts only',
+                'DesignFlow is an internal site. Sign in with your company work account.',
               )
             : page('Sign-in failed', 'We could not sign you in. Please try again.'),
         );
@@ -130,31 +130,12 @@ export class AuthController {
 
   // ---- Local development only ----------------------------------------------------------
 
+  /** Local development: no chooser, sign straight in as the one dev user. */
   @Get('dev')
   @Public()
-  devChooser(@Query('returnTo') returnTo: unknown, @Res() res: Response): void {
+  devEntry(@Query('returnTo') returnTo: unknown, @Res() res: Response): void {
     this.assertDevMode();
-    const target = encodeURIComponent(safeReturnTo(returnTo));
-    const cards = Object.entries(DEV_PERSONAS)
-      .map(([key, p]) => {
-        const role = p.roles[0] ?? 'Viewer';
-        const initials = p.displayName
-          .split(' ')
-          .map((w) => w[0])
-          .join('')
-          .slice(0, 2);
-        return `<li><a class="persona" href="/api/auth/dev/login?persona=${key}&amp;returnTo=${target}"><span class="avatar">${escapeHtml(initials)}</span><span class="who"><strong>${escapeHtml(p.displayName)}</strong><span>${escapeHtml(ROLE_HINT[role] ?? role)}</span></span><span class="role">${escapeHtml(ROLE_LABEL[role] ?? role)}</span></a></li>`;
-      })
-      .join('');
-    res
-      .type('html')
-      .send(
-        page(
-          'Choose a test persona',
-          `<p class="lead">Local development only. Each persona signs in with a different role, so you can see what that role can do.</p><ul class="personas">${cards}</ul>`,
-          { retry: false, badge: 'Development sign-in' },
-        ),
-      );
+    res.redirect(302, `/api/auth/dev/login?returnTo=${encodeURIComponent(safeReturnTo(returnTo))}`);
   }
 
   @Get('page.css')
@@ -167,14 +148,12 @@ export class AuthController {
   @Get('dev/login')
   @Public()
   async devLogin(
-    @Query('persona') persona: unknown,
     @Query('returnTo') returnTo: unknown,
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
     this.assertDevMode();
-    const user = typeof persona === 'string' ? DEV_PERSONAS[persona] : undefined;
-    if (!user) throw new NotFoundException();
+    const user = DEV_USER;
     const projects = await this.prisma.project.findMany({ select: { id: true } });
     await this.establishSession(
       req,
@@ -219,17 +198,6 @@ function escapeHtml(s: string): string {
 }
 
 /** Minimal static page: no scripts or inline styles, so it satisfies the strict CSP. */
-const ROLE_LABEL: Record<string, string> = {
-  Manager: 'Manager',
-  TeamLead: 'Team Lead',
-  Viewer: 'Designer',
-};
-const ROLE_HINT: Record<string, string> = {
-  Manager: 'Everything: all teams, edits anyone’s tasks, sync and the audit log',
-  TeamLead: 'Sees and edits everyone’s tasks, plus people metrics',
-  Viewer: 'Logs their own tasks and sees who is working on what',
-};
-
 /** Server-rendered auth pages share the app's look via a same-origin stylesheet (the CSP forbids inline styles). */
 function page(
   title: string,

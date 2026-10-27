@@ -91,3 +91,18 @@ export const boardColumnsResponse = list(
     stateMappings: z.record(z.string(), z.string()).default({}),
   }),
 );
+
+export const workItemRelationsResponse = z.object({
+  relations: z
+    .array(
+      z.object({
+        rel: z.string(),
+        url: z.string(),
+        attributes: z
+          .object({ name: z.string().optional(), resourceSize: z.number().optional() })
+          .partial()
+          .optional(),
+      }),
+    )
+    .nullish(),
+});

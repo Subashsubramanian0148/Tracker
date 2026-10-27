@@ -1,4 +1,10 @@
-import { Inject, Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+  OnApplicationShutdown,
+} from '@nestjs/common';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { SyncService } from './sync.service';
 
@@ -24,7 +30,9 @@ export class SyncScheduler implements OnApplicationBootstrap, OnApplicationShutd
       return;
     }
     this.track(setTimeout(() => void this.safeRun('startup'), STARTUP_DELAY_MS));
-    this.track(setInterval(() => void this.safeRun('schedule'), this.config.SYNC_INTERVAL_SECONDS * 1000));
+    this.track(
+      setInterval(() => void this.safeRun('schedule'), this.config.SYNC_INTERVAL_SECONDS * 1000),
+    );
   }
 
   onApplicationShutdown(): void {

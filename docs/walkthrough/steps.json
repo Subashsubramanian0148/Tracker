@@ -1,0 +1,52 @@
+[
+ {
+  "img": "step-01.jpg",
+  "title": "Open DesignFlow",
+  "text": "You land on your project's Overview: how delivery is going right now."
+ },
+ {
+  "img": "step-02.jpg",
+  "title": "Find your project",
+  "text": "Use the sidebar to switch projects. Each project has an Overview and a Board."
+ },
+ {
+  "img": "step-03.jpg",
+  "title": "Pick a period",
+  "text": "Choose This week, This month or This year. Every number on the page updates."
+ },
+ {
+  "img": "step-04.jpg",
+  "title": "Read the flow",
+  "text": "Scroll down for changes made mid-sprint, estimate vs actual, and delay warning signs."
+ },
+ {
+  "img": "step-05.jpg",
+  "title": "Open the Board",
+  "text": "Every story by stage: To do, In progress, Done. An amber badge means delayed."
+ },
+ {
+  "img": "step-06.jpg",
+  "title": "Filter the Board",
+  "text": "Show the Current sprint, only Delayed items, or the Backlog. Or search by name."
+ },
+ {
+  "img": "step-07.jpg",
+  "title": "Open a story",
+  "text": "Click a card: who has it, when it started, the description, Figma link and files."
+ },
+ {
+  "img": "step-08.jpg",
+  "title": "Tag your comments",
+  "text": "Comments come from Azure DevOps. Start one with #blocked, #unblocked, #reopen or #done so it counts."
+ },
+ {
+  "img": "step-09.jpg",
+  "title": "Check the metrics",
+  "text": "How long it took and why it is flagged. Use \"Not really late\" if the delay was planned."
+ },
+ {
+  "img": "step-10.jpg",
+  "title": "Explain delays",
+  "text": "See what changed while working, and use \"Add reason\" to record why it was late."
+ }
+]

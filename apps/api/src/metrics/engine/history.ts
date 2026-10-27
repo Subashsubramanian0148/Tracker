@@ -102,7 +102,8 @@ export function analyzeHistory(
     if (i === 0 || s.iterationPath !== currentPath) {
       const open = intervals[intervals.length - 1];
       if (open && open.exitedAt === null) open.exitedAt = at;
-      if (s.iterationPath) intervals.push({ iterationPath: s.iterationPath, enteredAt: at, exitedAt: null });
+      if (s.iterationPath)
+        intervals.push({ iterationPath: s.iterationPath, enteredAt: at, exitedAt: null });
       currentPath = s.iterationPath;
     }
 
@@ -144,7 +145,9 @@ export function analyzeHistory(
     activatedDate && completedDate && completedDate >= activatedDate
       ? hoursBetween(activatedDate, completedDate)
       : null;
-  const leadTimeHours = completedDate ? Math.max(0, hoursBetween(createdDate, completedDate)) : null;
+  const leadTimeHours = completedDate
+    ? Math.max(0, hoursBetween(createdDate, completedDate))
+    : null;
 
   const changes = rawChanges.map((c) => ({
     ...c,
@@ -167,7 +170,11 @@ export function analyzeHistory(
   };
 }
 
-function diff(prev: RevisionInput, next: RevisionInput, at: Date): Omit<ChangeOut, 'afterWorkStarted'>[] {
+function diff(
+  prev: RevisionInput,
+  next: RevisionInput,
+  at: Date,
+): Omit<ChangeOut, 'afterWorkStarted'>[] {
   const a = prev.snapshot;
   const b = next.snapshot;
   const out: Omit<ChangeOut, 'afterWorkStarted'>[] = [];
@@ -198,8 +205,10 @@ function diff(prev: RevisionInput, next: RevisionInput, at: Date): Omit<ChangeOu
   if ((a.assignedTo?.id ?? null) !== (b.assignedTo?.id ?? null)) {
     push('ASSIGNEE', 'Assigned To', a.assignedTo?.displayName, b.assignedTo?.displayName);
   }
-  if (a.iterationPath !== b.iterationPath) push('ITERATION', 'Iteration', a.iterationPath, b.iterationPath);
-  if (a.blocked !== b.blocked) push('BLOCKED', 'Blocked', a.blocked ? 'Yes' : 'No', b.blocked ? 'Yes' : 'No');
+  if (a.iterationPath !== b.iterationPath)
+    push('ITERATION', 'Iteration', a.iterationPath, b.iterationPath);
+  if (a.blocked !== b.blocked)
+    push('BLOCKED', 'Blocked', a.blocked ? 'Yes' : 'No', b.blocked ? 'Yes' : 'No');
   return out;
 }
 

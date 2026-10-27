@@ -37,7 +37,11 @@ export class WorkItemProcessor {
     return buildCategoryResolver(rows);
   }
 
-  async processItems(projectId: string, ids: readonly number[], latestText = new Map<number, LatestText>()) {
+  async processItems(
+    projectId: string,
+    ids: readonly number[],
+    latestText = new Map<number, LatestText>(),
+  ) {
     const categoryOf = await this.categoryResolver(projectId);
     const now = new Date();
     for (let i = 0; i < ids.length; i += CHUNK) {
@@ -53,71 +57,74 @@ export class WorkItemProcessor {
         byItem.set(r.workItemId, list);
       }
 
-      await this.prisma.$transaction(async (tx) => {
-        for (const [id, revs] of byItem) {
-          const inputs = revs.map((r) => ({
-            rev: r.rev,
-            changedDate: r.changedDate,
-            changedById: r.changedById,
-            snapshot: r.fields as unknown as RevisionSnapshot,
-          }));
-          const h = analyzeHistory(inputs, categoryOf, now);
-          const latest = inputs[inputs.length - 1]!;
-          const s = latest.snapshot;
-          const text = latestText.get(id);
-          const textFields =
-            text && text.rev === latest.rev
-              ? { description: text.description, acceptanceCriteria: text.acceptanceCriteria }
-              : {};
+      await this.prisma.$transaction(
+        async (tx) => {
+          for (const [id, revs] of byItem) {
+            const inputs = revs.map((r) => ({
+              rev: r.rev,
+              changedDate: r.changedDate,
+              changedById: r.changedById,
+              snapshot: r.fields as unknown as RevisionSnapshot,
+            }));
+            const h = analyzeHistory(inputs, categoryOf, now);
+            const latest = inputs[inputs.length - 1]!;
+            const s = latest.snapshot;
+            const text = latestText.get(id);
+            const textFields =
+              text && text.rev === latest.rev
+                ? { description: text.description, acceptanceCriteria: text.acceptanceCriteria }
+                : {};
 
-          const data = {
-            projectId,
-            type: s.type,
-            title: s.title,
-            state: s.state,
-            stateCategory: categoryOf(s.type, s.state),
-            reason: s.reason,
-            assignedToId: s.assignedTo?.id ?? null,
-            iterationPath: s.iterationPath,
-            areaPath: s.areaPath,
-            parentId: s.parentId,
-            tags: s.tags,
-            effort: s.effort,
-            originalEstimate: s.originalEstimate,
-            remainingWork: s.remainingWork,
-            completedWork: s.completedWork,
-            createdDate: h.createdDate,
-            changedDate: latest.changedDate,
-            rev: latest.rev,
-            isDeleted: s.isDeleted,
-            boardColumn: s.boardColumn ?? null,
-            activatedDate: h.activatedDate,
-            completedDate: h.completedDate,
-            cycleTimeHours: h.cycleTimeHours,
-            leadTimeHours: h.leadTimeHours,
-            blockedHours: h.blockedHours,
-            reopenCount: h.reopenCount,
-            initialEffort: h.initialEffort,
-            initialRemaining: h.initialRemaining,
-            metricsComputedAt: now,
-            ...textFields,
-          };
-          await tx.workItem.upsert({ where: { id }, create: { id, ...data }, update: data });
+            const data = {
+              projectId,
+              type: s.type,
+              title: s.title,
+              state: s.state,
+              stateCategory: categoryOf(s.type, s.state),
+              reason: s.reason,
+              assignedToId: s.assignedTo?.id ?? null,
+              iterationPath: s.iterationPath,
+              areaPath: s.areaPath,
+              parentId: s.parentId,
+              tags: s.tags,
+              effort: s.effort,
+              originalEstimate: s.originalEstimate,
+              remainingWork: s.remainingWork,
+              completedWork: s.completedWork,
+              createdDate: h.createdDate,
+              changedDate: latest.changedDate,
+              rev: latest.rev,
+              isDeleted: s.isDeleted,
+              boardColumn: s.boardColumn ?? null,
+              activatedDate: h.activatedDate,
+              completedDate: h.completedDate,
+              cycleTimeHours: h.cycleTimeHours,
+              leadTimeHours: h.leadTimeHours,
+              blockedHours: h.blockedHours,
+              reopenCount: h.reopenCount,
+              initialEffort: h.initialEffort,
+              initialRemaining: h.initialRemaining,
+              metricsComputedAt: now,
+              ...textFields,
+            };
+            await tx.workItem.upsert({ where: { id }, create: { id, ...data }, update: data });
 
-          await tx.stateSegment.deleteMany({ where: { workItemId: id } });
-          await tx.iterationInterval.deleteMany({ where: { workItemId: id } });
-          await tx.workItemChange.deleteMany({ where: { workItemId: id } });
-          await tx.stateSegment.createMany({
-            data: h.segments.map((seg) => ({ workItemId: id, projectId, ...seg })),
-          });
-          await tx.iterationInterval.createMany({
-            data: h.intervals.map((iv) => ({ workItemId: id, projectId, ...iv })),
-          });
-          await tx.workItemChange.createMany({
-            data: h.changes.map((c) => ({ workItemId: id, projectId, ...c })),
-          });
-        }
-      }, { timeout: 60_000 });
+            await tx.stateSegment.deleteMany({ where: { workItemId: id } });
+            await tx.iterationInterval.deleteMany({ where: { workItemId: id } });
+            await tx.workItemChange.deleteMany({ where: { workItemId: id } });
+            await tx.stateSegment.createMany({
+              data: h.segments.map((seg) => ({ workItemId: id, projectId, ...seg })),
+            });
+            await tx.iterationInterval.createMany({
+              data: h.intervals.map((iv) => ({ workItemId: id, projectId, ...iv })),
+            });
+            await tx.workItemChange.createMany({
+              data: h.changes.map((c) => ({ workItemId: id, projectId, ...c })),
+            });
+          }
+        },
+        { timeout: 60_000 },
+      );
     }
   }
 
@@ -126,7 +133,12 @@ export class WorkItemProcessor {
     const since = new Date(now.getTime() - BASELINE_DAYS * DAY_MS);
 
     const baseline = await this.prisma.workItem.findMany({
-      where: { projectId, isDeleted: false, completedDate: { gte: since }, cycleTimeHours: { not: null } },
+      where: {
+        projectId,
+        isDeleted: false,
+        completedDate: { gte: since },
+        cycleTimeHours: { not: null },
+      },
       select: { type: true, cycleTimeHours: true },
     });
     const byType = new Map<string, number[]>();
@@ -138,7 +150,13 @@ export class WorkItemProcessor {
     const p85CycleHoursByType = new Map<string, number>();
     for (const [type, values] of byType) {
       if (values.length >= MIN_BASELINE_SAMPLE) {
-        p85CycleHoursByType.set(type, percentile(values.sort((a, b) => a - b), 0.85)!);
+        p85CycleHoursByType.set(
+          type,
+          percentile(
+            values.sort((a, b) => a - b),
+            0.85,
+          )!,
+        );
       }
     }
 
@@ -146,7 +164,10 @@ export class WorkItemProcessor {
       where: { projectId, startDate: { not: null }, finishDate: { not: null } },
     });
     const sprintsByPath = new Map<string, SprintWindow>(
-      iterations.map((it) => [it.path, { path: it.path, startDate: it.startDate!, finishDate: it.finishDate! }]),
+      iterations.map((it) => [
+        it.path,
+        { path: it.path, startDate: it.startDate!, finishDate: it.finishDate! },
+      ]),
     );
 
     const items = await this.prisma.workItem.findMany({
@@ -169,26 +190,53 @@ export class WorkItemProcessor {
         delayFlags: true,
         delayDetectedAt: true,
         commentDelayHours: true,
-        comments: { select: { createdAt: true, signals: true } },
+        comments: { select: { commentId: true, createdAt: true, signals: true } },
+        signalOverrides: { select: { commentId: true } },
+        dismissal: { select: { workItemId: true } },
         intervals: { select: { iterationPath: true, enteredAt: true, exitedAt: true } },
       },
     });
 
     let changed = 0;
-    const updates: { id: number; flags: DelayFlag[]; detectedAt: Date | null; commentDelayHours: number }[] = [];
-    for (const item of items) {
+    const updates: {
+      id: number;
+      flags: DelayFlag[];
+      delayed: boolean;
+      detectedAt: Date | null;
+      commentDelayHours: number;
+    }[] = [];
+    for (const raw of items) {
+      // Comments someone marked "not a real signal" count as plain comments.
+      const ignored = new Set(raw.signalOverrides.map((o) => o.commentId));
+      const item = {
+        ...raw,
+        comments: raw.comments.map((c) => (ignored.has(c.commentId) ? { ...c, signals: [] } : c)),
+      };
       const commentHours = Math.round(
-        commentDelay(item.comments, { stateCategory: item.stateCategory as never, completedDate: item.completedDate }, now).hours,
+        commentDelay(
+          item.comments,
+          { stateCategory: item.stateCategory as never, completedDate: item.completedDate },
+          now,
+        ).hours,
       );
       const flags = detectDelays(
         { ...item, stateCategory: item.stateCategory as never },
-        { now, p85CycleHoursByType, sprintsByPath, blockedThresholdHours: this.config.DELAY_BLOCKED_HOURS },
+        {
+          now,
+          p85CycleHoursByType,
+          sprintsByPath,
+          blockedThresholdHours: this.config.DELAY_BLOCKED_HOURS,
+        },
       );
-      const same = flags.length === item.delayFlags.length && flags.every((f) => item.delayFlags.includes(f));
-      if (same && commentHours === Math.round(item.commentDelayHours)) continue;
+      const same =
+        flags.length === item.delayFlags.length && flags.every((f) => item.delayFlags.includes(f));
+      const delayed = flags.length > 0 && !item.dismissal;
+      if (same && delayed === item.isDelayed && commentHours === Math.round(item.commentDelayHours))
+        continue;
       updates.push({
         id: item.id,
         flags,
+        delayed,
         detectedAt: flags.length === 0 ? null : (item.delayDetectedAt ?? now),
         commentDelayHours: commentHours,
       });
@@ -201,7 +249,7 @@ export class WorkItemProcessor {
             where: { id: u.id },
             data: {
               delayFlags: u.flags,
-              isDelayed: u.flags.length > 0,
+              isDelayed: u.delayed,
               delayDetectedAt: u.detectedAt,
               commentDelayHours: u.commentDelayHours,
             },

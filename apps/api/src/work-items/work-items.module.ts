@@ -8,7 +8,12 @@ import { WorkItemsService } from './work-items.service';
 
 @Module({
   imports: [MetricsModule],
-  controllers: [ProjectsController, WorkItemsController, DelaysController, DelayCategoriesController],
+  controllers: [
+    ProjectsController,
+    WorkItemsController,
+    DelaysController,
+    DelayCategoriesController,
+  ],
   providers: [WorkItemsService, DelaysService],
 })
 export class WorkItemsModule {}

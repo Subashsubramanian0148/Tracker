@@ -23,7 +23,14 @@ export const STATE_CATEGORIES = [
 ] as const;
 export type StateCategory = (typeof STATE_CATEGORIES)[number];
 
-export const WORK_ITEM_TYPES = ['Epic', 'Feature', 'Product Backlog Item', 'Issue', 'Bug', 'Task'] as const;
+export const WORK_ITEM_TYPES = [
+  'Epic',
+  'Feature',
+  'Product Backlog Item',
+  'Issue',
+  'Bug',
+  'Task',
+] as const;
 
 export const DELAY_FLAGS = [
   'CYCLE_TIME_OUTLIER',
@@ -99,6 +106,7 @@ export interface CurrentUser {
   id: string;
   displayName: string;
   email: string;
+  jobTitle?: string;
   roles: Role[];
 }
 
@@ -254,7 +262,13 @@ export interface WorkItemDetail extends WorkItemSummary {
   comments: WorkItemComment[];
   /** Time held up according to reopen/blocked comments, in days. */
   commentDelayDays: number;
+  /** Set when the team agreed the item wasn't really late. */
+  dismissal: { reason: string; by: string; at: string } | null;
+  attachments: { name: string; url: string; sizeBytes: number | null }[];
 }
+
+export const dismissDelayBody = z.object({ reason: z.string().trim().min(3).max(500) }).strict();
+export type DismissDelayBody = z.infer<typeof dismissDelayBody>;
 
 export const COMMENT_SIGNALS = ['REOPEN', 'BLOCKED', 'UNBLOCKED', 'DONE'] as const;
 export type CommentSignal = (typeof COMMENT_SIGNALS)[number];
@@ -265,6 +279,8 @@ export interface WorkItemComment {
   createdAt: string;
   text: string;
   signals: CommentSignal[];
+  /** Someone marked this comment's tags as not a real signal; it no longer counts. */
+  ignored: boolean;
 }
 
 // ---------------------------------------------------------------------------

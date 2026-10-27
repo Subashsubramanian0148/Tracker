@@ -72,17 +72,27 @@ export function detectDelays(item: DelayInput, ctx: DelayContext): DelayFlag[] {
 
   if (!done && item.iterationPath) {
     const sprint = ctx.sprintsByPath.get(item.iterationPath);
-    if (sprint && sprint.finishDate.getTime() + DAY_MS < ctx.now.getTime()) flags.push('PAST_SPRINT_END');
+    if (sprint && sprint.finishDate.getTime() + DAY_MS < ctx.now.getTime())
+      flags.push('PAST_SPRINT_END');
   }
 
   if (item.blockedHours > ctx.blockedThresholdHours) flags.push('LONG_BLOCKED');
   if (item.reopenCount > 0) flags.push('REOPENED');
-  if (item.comments?.length) flags.push(...commentDelay(item.comments, item, ctx.now).flags);
+  if (item.comments?.length) {
+    // The Blocked field is the real record; a #blocked comment only counts when the field was never used.
+    const fromComments = commentDelay(item.comments, item, ctx.now).flags;
+    flags.push(
+      ...fromComments.filter((f) => f !== 'BLOCKED_IN_COMMENTS' || item.blockedHours === 0),
+    );
+  }
   return flags;
 }
 
 /** Number of sprints the item was still in, unfinished, when the sprint ended. */
-export function carriedOverCount(item: DelayInput, ctx: Pick<DelayContext, 'sprintsByPath' | 'now'>): number {
+export function carriedOverCount(
+  item: DelayInput,
+  ctx: Pick<DelayContext, 'sprintsByPath' | 'now'>,
+): number {
   let count = 0;
   const seen = new Set<string>();
   for (const iv of item.intervals) {
@@ -91,8 +101,10 @@ export function carriedOverCount(item: DelayInput, ctx: Pick<DelayContext, 'spri
     // Only sprints whose finish day is over; the current sprint can't have carried anything over yet.
     if (sprint.finishDate.getTime() + DAY_MS > ctx.now.getTime()) continue;
     const cutoff = sprint.finishDate.getTime() - CARRY_OVER_GRACE_MS;
-    const coversEnd = iv.enteredAt.getTime() <= cutoff && (iv.exitedAt === null || iv.exitedAt.getTime() > cutoff);
-    const unfinished = !item.completedDate || item.completedDate.getTime() > sprint.finishDate.getTime() + DAY_MS;
+    const coversEnd =
+      iv.enteredAt.getTime() <= cutoff && (iv.exitedAt === null || iv.exitedAt.getTime() > cutoff);
+    const unfinished =
+      !item.completedDate || item.completedDate.getTime() > sprint.finishDate.getTime() + DAY_MS;
     const movedOn = iv.exitedAt !== null || item.stateCategory !== 'Completed';
     if (coversEnd && unfinished && movedOn) {
       count++;
@@ -102,10 +114,14 @@ export function carriedOverCount(item: DelayInput, ctx: Pick<DelayContext, 'spri
   return count;
 }
 
-export function sprintsSpanned(item: Pick<DelayInput, 'intervals'>, sprintsByPath: ReadonlyMap<string, SprintWindow>): string[] {
+export function sprintsSpanned(
+  item: Pick<DelayInput, 'intervals'>,
+  sprintsByPath: ReadonlyMap<string, SprintWindow>,
+): string[] {
   const paths: string[] = [];
   for (const iv of item.intervals) {
-    if (sprintsByPath.has(iv.iterationPath) && !paths.includes(iv.iterationPath)) paths.push(iv.iterationPath);
+    if (sprintsByPath.has(iv.iterationPath) && !paths.includes(iv.iterationPath))
+      paths.push(iv.iterationPath);
   }
   return paths;
 }

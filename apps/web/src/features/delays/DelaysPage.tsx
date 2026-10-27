@@ -18,7 +18,7 @@ import { SegmentedControl } from '../../components/ui/SegmentedControl';
 import { SkeletonRows } from '../../components/ui/Skeleton';
 import { canAddDelayReason, useMe } from '../../lib/auth';
 import { useRegisterExport } from '../../lib/exportStore';
-import { formatDays, formatShortDate, typeShortCode } from '../../lib/format';
+import { formatShortDate, formatWholeDays, typeShortCode } from '../../lib/format';
 import { delayFlagLabel } from '../../lib/labels';
 
 const PAGE_SIZE = 20;
@@ -158,7 +158,9 @@ function DelayRow({ item, projectId }: { item: DelayedItem; projectId: string })
             {wi.assignedTo?.displayName ?? 'Unassigned'}
           </span>
           <span>{wi.state}</span>
-          {wi.cycleTimeDays !== null ? <span>Cycle {formatDays(wi.cycleTimeDays)}</span> : null}
+          {wi.cycleTimeDays !== null ? (
+            <span>Worked {formatWholeDays(wi.cycleTimeDays)}</span>
+          ) : null}
           <span>Flagged {formatShortDate(item.detectedAt)}</span>
         </p>
         {item.latestReason ? (

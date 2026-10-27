@@ -35,8 +35,8 @@ const TYPE_OPTIONS = [
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'changedDate', label: 'Recently changed' },
-  { value: 'cycleTime', label: 'Cycle time' },
-  { value: 'leadTime', label: 'Lead time' },
+  { value: 'cycleTime', label: 'Time spent working' },
+  { value: 'leadTime', label: 'From request to done' },
   { value: 'id', label: 'ID' },
 ];
 
@@ -133,61 +133,61 @@ export function BoardPage() {
           <div className="ml-auto w-full sm:w-auto">{searchBox}</div>
         </div>
       ) : (
-      <SectionToolbar
-        title="Your work items"
-        right={
-          <Popover
-            align="end"
-            label="Quick filters"
-            panelClassName="w-72 p-4"
-            trigger={(props) => (
-              <button type="button" {...props} className={buttonClasses('secondary', 'md')}>
-                <SlidersHorizontal aria-hidden className="size-4" />
-                Quick Filters
-                {type || sort ? (
-                  <>
-                    <span aria-hidden className="size-1.5 rounded-full bg-primary" />
-                    <span className="sr-only">(active)</span>
-                  </>
-                ) : null}
-              </button>
-            )}
-          >
-            {() => (
-              <div className="space-y-3">
-                <Select
-                  label="Work item type"
-                  value={type}
-                  onChange={setType}
-                  options={TYPE_OPTIONS}
-                />
-                <Select
-                  label="Sort by"
-                  value={sort ?? 'changedDate'}
-                  onChange={(v) => setSort(v === 'changedDate' ? undefined : (v as SortKey))}
-                  options={SORT_OPTIONS}
-                />
-                {type || sort ? (
-                  <button
-                    type="button"
-                    className="text-sm font-medium text-primary underline-offset-2 hover:underline"
-                    onClick={() => {
-                      setType('');
-                      setSort(undefined);
-                    }}
-                  >
-                    Reset filters
-                  </button>
-                ) : null}
-              </div>
-            )}
-          </Popover>
-        }
-      >
-        {segments}
-        <TeamSelect className="w-44" />
-        {searchBox}
-      </SectionToolbar>
+        <SectionToolbar
+          title="Your work items"
+          right={
+            <Popover
+              align="end"
+              label="Quick filters"
+              panelClassName="w-72 p-4"
+              trigger={(props) => (
+                <button type="button" {...props} className={buttonClasses('secondary', 'md')}>
+                  <SlidersHorizontal aria-hidden className="size-4" />
+                  Quick Filters
+                  {type || sort ? (
+                    <>
+                      <span aria-hidden className="size-1.5 rounded-full bg-primary" />
+                      <span className="sr-only">(active)</span>
+                    </>
+                  ) : null}
+                </button>
+              )}
+            >
+              {() => (
+                <div className="space-y-3">
+                  <Select
+                    label="Work item type"
+                    value={type}
+                    onChange={setType}
+                    options={TYPE_OPTIONS}
+                  />
+                  <Select
+                    label="Sort by"
+                    value={sort ?? 'changedDate'}
+                    onChange={(v) => setSort(v === 'changedDate' ? undefined : (v as SortKey))}
+                    options={SORT_OPTIONS}
+                  />
+                  {type || sort ? (
+                    <button
+                      type="button"
+                      className="text-sm font-medium text-primary underline-offset-2 hover:underline"
+                      onClick={() => {
+                        setType('');
+                        setSort(undefined);
+                      }}
+                    >
+                      Reset filters
+                    </button>
+                  ) : null}
+                </div>
+              )}
+            </Popover>
+          }
+        >
+          {segments}
+          <TeamSelect className="w-44" />
+          {searchBox}
+        </SectionToolbar>
       )}
 
       {segment === 'sprint' && currentIteration ? (

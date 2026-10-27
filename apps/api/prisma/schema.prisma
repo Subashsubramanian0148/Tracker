@@ -177,6 +177,9 @@ model WorkItem {
   changes      WorkItemChange[]
   delayReasons DelayReason[]
   comments     WorkItemComment[]
+  signalOverrides CommentSignalOverride[]
+  dismissal    DelayDismissal?
+  attachments  WorkItemAttachment[]
 
   @@index([projectId, stateCategory])
   @@index([projectId, changedDate])
@@ -208,6 +211,49 @@ model WorkItemComment {
   @@id([workItemId, commentId])
   @@index([projectId])
   @@map("work_item_comment")
+}
+
+/// A tagged comment someone marked as not a real signal ("Not a blocker"). Survives comment re-syncs.
+model CommentSignalOverride {
+  workItemId    Int      @map("work_item_id")
+  commentId     Int      @map("comment_id")
+  projectId     String   @map("project_id") @db.Uuid
+  ignoredById   String   @map("ignored_by_id")
+  ignoredByName String   @map("ignored_by_name")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  workItem WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+
+  @@id([workItemId, commentId])
+  @@index([projectId])
+  @@map("comment_signal_override")
+}
+
+/// The team agreed this item wasn't really late. Its flags stay visible; it leaves the late count.
+model DelayDismissal {
+  workItemId      Int      @id @map("work_item_id")
+  projectId       String   @map("project_id") @db.Uuid
+  reason          String
+  dismissedById   String   @map("dismissed_by_id")
+  dismissedByName String   @map("dismissed_by_name")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  workItem WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+
+  @@map("delay_dismissal")
+}
+
+/// Files attached in Azure DevOps (links only).
+model WorkItemAttachment {
+  workItemId Int    @map("work_item_id")
+  url        String
+  name       String
+  sizeBytes  Int?   @map("size_bytes")
+
+  workItem WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+
+  @@id([workItemId, url])
+  @@map("work_item_attachment")
 }
 
 model WorkItemRevision {

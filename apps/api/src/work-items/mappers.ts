@@ -1,4 +1,10 @@
-import type { DelayFlag, DelayReason, PersonRef, StateCategory, WorkItemSummary } from '@ado-metrics/shared';
+import type {
+  DelayFlag,
+  DelayReason,
+  PersonRef,
+  StateCategory,
+  WorkItemSummary,
+} from '@ado-metrics/shared';
 import { toDays } from '../metrics/engine/stats';
 
 export interface WorkItemRow {
