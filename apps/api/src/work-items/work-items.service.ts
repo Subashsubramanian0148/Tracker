@@ -110,16 +110,16 @@ export class WorkItemsService {
     user: SessionUser,
     visibility?: PersonVisibility,
   ): Promise<WorkItemSummary[]> {
-    const [people, finishByPath, vis] = await Promise.all([
+    const [people, sprints, vis] = await Promise.all([
       this.scope.peopleById(rows.map((r) => r.assignedToId)),
-      this.scope.sprintFinishByPath(projectId),
+      this.scope.sprints(projectId),
       visibility ? Promise.resolve(visibility) : this.scope.personVisibility(user, projectId),
     ]);
     return rows.map((r) =>
       toSummary(
         r,
         this.scope.personRef(r.assignedToId ? people.get(r.assignedToId) : null, vis),
-        finishByPath,
+        sprints,
         r._count.delayReasons > 0,
       ),
     );

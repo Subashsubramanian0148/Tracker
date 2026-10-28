@@ -16,7 +16,6 @@ import { DAY_MS } from '../metrics/engine/stats';
 import { WorkItemProcessor, type LatestText } from '../metrics/work-item-processor.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobLeaseService } from './job-lease.service';
-import { SPRINT_SEPARATOR } from '../work-items/mappers';
 
 export type SyncTrigger = SyncRunDto['trigger'];
 export interface SyncOptions {
@@ -269,6 +268,7 @@ export class SyncService {
       ]);
     }
     await this.syncBoardColumns(projectId, teams);
+    await this.syncProjectSprints(projectId);
     this.metadataRefreshedAt.set(projectId, Date.now());
   }
 
@@ -438,7 +438,7 @@ export class SyncService {
       if (await this.syncRelations(projectId, id)) parentSprintChanged.push(id);
     }
     if (parentSprintChanged.length) {
-      await this.syncParentSprints(projectId);
+      await this.syncProjectSprints(projectId);
       // Their sprint history depends on the parent's sprint, which is only known now.
       await this.processor.processItems(projectId, parentSprintChanged);
     }
@@ -477,20 +477,12 @@ export class SyncService {
    * settings, so a parent's sprint (e.g. one planned by another team) would otherwise have no
    * start or end date.
    */
-  private async syncParentSprints(projectId: string) {
-    const [wanted, known] = await Promise.all([
-      this.prisma.workItem.findMany({
-        where: { projectId, parentIterationPath: { contains: SPRINT_SEPARATOR } },
-        select: { parentIterationPath: true },
-        distinct: ['parentIterationPath'],
-      }),
-      this.prisma.iteration.findMany({ where: { projectId }, select: { path: true } }),
-    ]);
-    const have = new Set(known.map((k) => k.path));
-    const missing = new Set(wanted.map((w) => w.parentIterationPath!).filter((p) => !have.has(p)));
-    if (!missing.size) return;
+  /**
+   * Stores every sprint in the project with its dates, not only the team's: parents sit in other
+   * sprints, and a story with no usable sprint is placed by the dates of the one running then.
+   */
+  private async syncProjectSprints(projectId: string) {
     for (const it of await this.ado.listProjectIterations(projectId)) {
-      if (!missing.has(it.path)) continue;
       const dates = {
         name: it.name,
         startDate: parseDate(it.startDate ?? undefined),

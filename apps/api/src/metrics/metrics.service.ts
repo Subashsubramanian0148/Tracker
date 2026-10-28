@@ -106,7 +106,8 @@ export class MetricsService {
       };
       row.total++;
       if (done) row.delivered++;
-      else row.open++;
+      // Only work someone is on (In progress or Review), not stories still in To do.
+      else if (i.stateCategory !== 'Proposed') row.open++;
       people.set(key, row);
     }
     return {

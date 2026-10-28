@@ -1,4 +1,4 @@
-import type { Iteration, ProjectSummary, TeamRef } from '@ado-metrics/shared';
+import type { ApiHealth, Iteration, ProjectSummary, TeamRef } from '@ado-metrics/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { api, seg } from './client';
@@ -20,6 +20,23 @@ export function useTeams(projectId: string) {
     queryFn: ({ signal }) =>
       api.get<TeamRef[]>(`/projects/${seg(projectId)}/teams`, undefined, signal),
     staleTime: 10 * 60_000,
+  });
+}
+
+/** Live API health, refreshed every 10 s, with the round trip measured from this browser. */
+export function useApiHealth(projectId: string) {
+  return useQuery({
+    queryKey: qk.health(projectId),
+    queryFn: async ({ signal }) => {
+      const t = performance.now();
+      const health = await api.get<ApiHealth>(
+        `/projects/${seg(projectId)}/health`,
+        undefined,
+        signal,
+      );
+      return { health, roundTripMs: Math.round(performance.now() - t) };
+    },
+    refetchInterval: 10_000,
   });
 }
 

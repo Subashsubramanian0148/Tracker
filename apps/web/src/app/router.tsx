@@ -26,6 +26,12 @@ export const router = createBrowserRouter([
             }),
           },
           {
+            path: 'health',
+            lazy: async () => ({
+              Component: (await import('../features/health/HealthPage')).HealthPage,
+            }),
+          },
+          {
             path: 'dashboard',
             lazy: async () => ({
               Component: (await import('../features/dashboard/DashboardPage')).DashboardPage,

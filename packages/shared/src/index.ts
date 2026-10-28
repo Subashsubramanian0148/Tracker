@@ -614,3 +614,28 @@ export interface TaskSummary {
   /** Oldest week first; weeks start on Monday. */
   weekly: { weekStart: string; created: number; completed: number; completedLate: number }[];
 }
+
+/** Live health of the API and its connections, for the project's API Health tab. */
+export type HealthStatus = 'ok' | 'degraded' | 'down';
+export interface ApiHealth {
+  checkedAt: string;
+  api: { status: HealthStatus; uptimeSeconds: number; version: string | null };
+  database: { status: HealthStatus; latencyMs: number | null };
+  /** Azure DevOps reachability, judged by the most recent sync runs. */
+  azureDevOps: { status: HealthStatus; lastSuccessAt: string | null };
+  sync: {
+    lastSyncedAt: string | null;
+    runsLast24h: number;
+    failedLast24h: number;
+    avgDurationMs: number | null;
+    lastError: string | null;
+  };
+  data: { workItems: number; revisions: number; comments: number };
+  recentRuns: {
+    startedAt: string;
+    status: string;
+    durationMs: number | null;
+    items: number;
+    trigger: string;
+  }[];
+}

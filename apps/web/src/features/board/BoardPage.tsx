@@ -15,6 +15,7 @@ import { formatNumber } from '../../lib/format';
 import { useDebouncedValue, useNow } from '../../lib/hooks';
 import { expectedDate, StoryCard } from './StoryCard';
 import { isReopened, REOPEN, stageOf, STAGES } from './stages';
+import { SegmentedControl } from '../../components/ui/SegmentedControl';
 import { Select } from '../../components/ui/Select';
 
 type SortKey = 'newest' | 'oldest' | 'due';
@@ -99,17 +100,17 @@ export function BoardPage() {
     />
   );
   const stageSelect = (
-    <Select
-      label="Stage"
-      hideLabel
-      value={current.key}
-      onChange={setStage}
-      options={stages.map((s) => ({
-        value: s.key,
-        label: `${s.label}${query.data ? ` (${formatNumber(s.items.length)})` : ''}`,
-      }))}
-      triggerClassName="w-full sm:w-60"
-    />
+    <div className="max-w-full overflow-x-auto">
+      <SegmentedControl
+        label="Stage"
+        value={current.key}
+        onChange={setStage}
+        options={stages.map((s) => ({
+          value: s.key,
+          label: `${s.label}${query.data ? ` (${formatNumber(s.items.length)})` : ''}`,
+        }))}
+      />
+    </div>
   );
   const sortSelect = (
     <Select

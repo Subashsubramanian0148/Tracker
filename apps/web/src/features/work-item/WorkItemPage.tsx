@@ -645,7 +645,8 @@ function buildDataIssues(item: WorkItemDetail, figma: string | null) {
   if (
     item.activatedDate &&
     item.dueDate &&
-    Date.parse(item.activatedDate) > Date.parse(item.dueDate)
+    // Compared by day: starting on the sprint's last day is still inside it.
+    item.activatedDate.slice(0, 10) > item.dueDate.slice(0, 10)
   ) {
     issues.push({
       text: item.iterationFromParent
@@ -656,6 +657,11 @@ function buildDataIssues(item: WorkItemDetail, figma: string | null) {
         : 'Set the Iteration field in Azure DevOps to the sprint it is really in.',
     });
   }
+  if (!item.iterationPath?.includes('\\'))
+    issues.push({
+      text: 'No sprint is set on this story or its parent.',
+      fix: 'Set the Iteration in Azure DevOps on this story or its parent.',
+    });
   if (!item.assignedTo)
     issues.push({
       text: 'No one is assigned.',

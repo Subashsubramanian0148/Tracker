@@ -6,6 +6,7 @@ export const qk = {
   projects: ['projects'] as const,
   project: (projectId: string) => ['project', projectId] as const,
   teams: (projectId: string) => ['project', projectId, 'teams'] as const,
+  health: (projectId: string) => ['project', projectId, 'health'] as const,
   iterations: (projectId: string, teamId?: string) =>
     ['project', projectId, 'iterations', teamId ?? null] as const,
   workItems: (projectId: string, params?: QueryParams) =>

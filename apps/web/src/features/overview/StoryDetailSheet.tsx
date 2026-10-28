@@ -25,7 +25,7 @@ interface Group {
 const COPY: Record<DetailKind, { title: string; description: string }> = {
   stages: { title: 'Stories', description: 'Every story on the board in this period, by stage' },
   delay: { title: 'On Time vs. Delayed', description: 'Delayed stories show what flagged them' },
-  people: { title: 'Teammates', description: 'Stories each person is holding or has delivered' },
+  people: { title: 'Teammates', description: 'Stories each person has in progress or in review' },
   warnings: { title: 'Delay Warning Signs', description: 'Stories behind each warning sign' },
 };
 
@@ -48,11 +48,17 @@ function groupsFor(kind: DetailKind, data: StorySummary): Group[] {
     ];
   }
   if (kind === 'people') {
-    return data.people.map((p) => ({
-      key: p.person?.id ?? 'unassigned',
-      label: p.person?.displayName ?? 'Unassigned',
-      match: (i) => (i.assignedTo?.id ?? null) === (p.person?.id ?? null),
-    }));
+    // Only work someone is on: not To do, not Done. Matches the Teammates card.
+    return data.people
+      .filter((p) => p.open > 0)
+      .map((p) => ({
+        key: p.person?.id ?? 'unassigned',
+        label: p.person?.displayName ?? 'Unassigned',
+        match: (i) =>
+          (i.assignedTo?.id ?? null) === (p.person?.id ?? null) &&
+          i.stateCategory !== 'Proposed' &&
+          i.stateCategory !== 'Completed',
+      }));
   }
   const flags = [...new Set(data.items.flatMap((i) => i.delayFlags))];
   return flags.map((f) => ({

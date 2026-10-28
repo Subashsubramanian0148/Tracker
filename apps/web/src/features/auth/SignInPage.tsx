@@ -206,7 +206,26 @@ function StageLine({ stage }: { stage: number }) {
 }
 
 /** A small DesignFlow dashboard playing a scripted sprint: one story moves along the line at a time. */
+/** Project, team and current sprint from the public showcase endpoint; null until loaded. */
+function useShowcase() {
+  const [info, setInfo] = useState<{
+    project: string | null;
+    team: string | null;
+    sprint: string | null;
+  } | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch('/api/showcase', { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setInfo)
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, []);
+  return info;
+}
+
 function DashboardMock() {
+  const info = useShowcase();
   const [step, setStep] = useState(0);
   useEffect(() => {
     const id = window.setInterval(() => setStep((s) => (s + 1) % TIMELINE.length), STEP_MS);
@@ -226,9 +245,9 @@ function DashboardMock() {
             <img src="/core-mark.png" alt="" className="size-6" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-ink">CORE 2.0</p>
+            <p className="text-sm font-semibold text-ink">{info?.project ?? 'CORE 2.0'}</p>
             <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
-              UX Team · Sprint 118
+              {[info?.team ?? 'UX Team', info?.sprint].filter(Boolean).join(' · ')}
             </p>
           </div>
           <span className="flex items-center gap-1.5 rounded-full bg-[#E6EFFD] px-2 py-0.5 text-[10px] font-medium text-[#2563EB]">

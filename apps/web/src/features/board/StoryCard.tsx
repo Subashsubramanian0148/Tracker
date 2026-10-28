@@ -83,6 +83,8 @@ export function expectedDate(item: WorkItemSummary): string | null {
 /** In-progress story: when it came in, who has it, how far along it is and when it is due. */
 export function StoryCard({ item, projectId, now }: StoryCardProps) {
   const progress = progressOf(item);
+  // Last segment of the Iteration path; the project root alone is not a sprint.
+  const sprint = item.iterationPath?.includes('\\') ? item.iterationPath.split('\\').pop() : null;
   const due = expectedDate(item);
   const overdue = isOverdue(due, now, item.stateCategory === 'Completed');
   const received = daysBetween(item.createdDate, now) ?? 0;
@@ -105,6 +107,14 @@ export function StoryCard({ item, projectId, now }: StoryCardProps) {
         <span className="rounded-md bg-surface/80 px-2 py-0.5 font-display text-[11px] font-semibold tracking-wide text-ink-soft tabular-nums">
           {typeShortCode(item.type)} · {item.id}
         </span>
+        {sprint ? (
+          <span
+            className="rounded-md bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-foreground"
+            title={item.iterationFromParent ? 'Sprint taken from the parent story' : undefined}
+          >
+            {sprint}
+          </span>
+        ) : null}
         {isReopened(item) ? (
           <span className="inline-flex items-center gap-1 rounded-md bg-danger/10 px-2 py-0.5 text-[11px] font-semibold text-danger">
             <RotateCcw aria-hidden className="size-3" />

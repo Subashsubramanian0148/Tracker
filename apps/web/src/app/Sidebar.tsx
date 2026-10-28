@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Folder,
   LayoutGrid,
+  Activity,
   Rocket,
   ListTodo,
   LogOut,
@@ -154,6 +155,9 @@ export function Sidebar({
                 onNavigate={onNavigate}
               >
                 Dashboard
+              </SideLink>
+              <SideLink to="/health" icon={Activity} collapsed={collapsed} onNavigate={onNavigate}>
+                API Health
               </SideLink>
             </>
           )}

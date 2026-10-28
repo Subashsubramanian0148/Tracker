@@ -14,6 +14,7 @@ import { ProblemDetailsFilter } from './common/problem-details.filter';
 import { APP_CONFIG, type AppConfig } from './config/config';
 import { ConfigModule } from './config/config.module';
 import { HealthController } from './health/health.controller';
+import { ShowcaseController } from './health/showcase.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { RetentionService } from './retention/retention.service';
 import { SyncModule } from './sync/sync.module';
@@ -52,9 +53,12 @@ function hasPrettyLogger(): boolean {
             censor: '[redacted]',
           },
           customProps: (req: IncomingMessage) => ({
-            userId: (req as IncomingMessage & { session?: { user?: { id: string } } }).session?.user?.id,
+            userId: (req as IncomingMessage & { session?: { user?: { id: string } } }).session?.user
+              ?.id,
           }),
-          autoLogging: { ignore: (req: IncomingMessage) => req.url?.startsWith('/api/health') ?? false },
+          autoLogging: {
+            ignore: (req: IncomingMessage) => req.url?.startsWith('/api/health') ?? false,
+          },
           ...(!config.isProduction && hasPrettyLogger()
             ? { transport: { target: 'pino-pretty', options: { singleLine: true } } }
             : {}),
@@ -71,7 +75,7 @@ function hasPrettyLogger(): boolean {
     // TasksModule,
     WorkItemsModule,
   ],
-  controllers: [HealthController, AdminAuditController],
+  controllers: [HealthController, ShowcaseController, AdminAuditController],
   providers: [
     RetentionService,
     { provide: APP_FILTER, useClass: ProblemDetailsFilter },

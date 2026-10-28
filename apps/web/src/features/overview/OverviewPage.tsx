@@ -404,15 +404,22 @@ function StoriesSummaryCard({
 }
 
 function PeopleCard({ data, onOpen }: { data: StorySummary | undefined; onOpen: () => void }) {
-  // Who holds the most open work first.
-  const assigned = (data?.people.filter((p) => p.person) ?? []).sort((x, y) => y.open - x.open);
+  // Who holds the most work in progress first; people with nothing in progress are left out.
+  const assigned = (data?.people.filter((p) => p.person && p.open > 0) ?? []).sort(
+    (x, y) => y.open - x.open,
+  );
   const unassigned = data?.people.find((p) => !p.person)?.open ?? 0;
   return (
-    <PlanCard onOpen={onOpen} title="Teammates" description="Open stories per person" icon={Users}>
+    <PlanCard
+      onOpen={onOpen}
+      title="Teammates"
+      description="In progress or in review, per person"
+      icon={Users}
+    >
       {!data ? (
         <Skeleton className="h-32" />
       ) : assigned.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No assigned stories in this period.</p>
+        <p className="text-sm text-muted-foreground">No one has a story in progress or review.</p>
       ) : (
         // One line per person so this card matches the height of its neighbours.
         <ul className="-mr-2 max-h-[132px] divide-y divide-line overflow-y-auto pr-2">
@@ -441,8 +448,8 @@ function PeopleCard({ data, onOpen }: { data: StorySummary | undefined; onOpen: 
       )}
       {data && unassigned > 0 ? (
         <p className="mt-auto pt-3 text-xs text-muted-foreground">
-          {formatNumber(unassigned)} open {unassigned === 1 ? 'story is' : 'stories are'} not
-          assigned yet
+          {formatNumber(unassigned)} {unassigned === 1 ? 'story' : 'stories'} in progress with no
+          one assigned
         </p>
       ) : null}
     </PlanCard>
