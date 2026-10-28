@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type {
   DelayFlag,
   Iteration,
@@ -11,6 +11,7 @@ import type {
 } from '@ado-metrics/shared';
 import { DELAY_FLAGS, SCOPE_CHANGE_KINDS } from '@ado-metrics/shared';
 import { ScopeService } from '../common/scope.service';
+import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { SessionUser } from '../common/session.types';
 import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -29,7 +30,18 @@ export class MetricsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scope: ScopeService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
+
+  /** True when TEAMMATES is unset or the name starts with one of its entries. */
+  private isTeammate(displayName: string): boolean {
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '');
+    const name = norm(displayName);
+    return (
+      this.config.TEAMMATES.length === 0 ||
+      this.config.TEAMMATES.some((t) => name.startsWith(norm(t)))
+    );
+  }
 
   /**
    * Stories that were on the board during the range: created by its end and not finished before
@@ -106,9 +118,9 @@ export class MetricsService {
       onTime: items.length - delayed,
       delayed,
       // Unassigned goes last so the list reads as "who holds what".
-      people: [...people.values()].sort(
-        (a, b) => Number(!a.person) - Number(!b.person) || b.total - a.total,
-      ),
+      people: [...people.values()]
+        .filter((p) => !p.person || this.isTeammate(p.person.displayName))
+        .sort((a, b) => Number(!a.person) - Number(!b.person) || b.total - a.total),
       items: items.map((i) => ({
         id: i.id,
         title: i.title,

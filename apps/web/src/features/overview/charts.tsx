@@ -21,7 +21,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { formatDate, formatDays, formatShortDate } from '../../lib/format';
 
 // Validated categorical slots (see styles tokens --color-series-*), fixed order.
-const SERIES = ['#BA141A', '#2a78d6', '#1baf7a'] as const;
+const SERIES = ['#2563eb', '#f97316', '#1baf7a'] as const;
 const AXIS = { fontSize: 12, fill: '#6b6b6b' };
 const GRID = '#ececec';
 

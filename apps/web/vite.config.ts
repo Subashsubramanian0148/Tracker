@@ -11,13 +11,13 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       // Keep the Host header so the session cookie set by the API stays first-party.
-      '/api': { target: 'http://localhost:3000', changeOrigin: false },
+      '/api': { target: 'http://127.0.0.1:3000', changeOrigin: false },
     },
   },
   preview: {
     port: 4173,
     proxy: {
-      '/api': { target: 'http://localhost:3000', changeOrigin: false },
+      '/api': { target: 'http://127.0.0.1:3000', changeOrigin: false },
     },
   },
   build: {

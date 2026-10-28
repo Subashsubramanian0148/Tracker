@@ -1,0 +1,217 @@
+<title>DesignFlow Tech Stack</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column; data path strip, layer filter, then a card grid per layer. Click a card for detail. */
+:root {
+  --bg: #f7f5f1; --surface: #ffffff; --ink: #1c1917; --muted: #6f6a64; --line: #e3dfd8;
+  --front: #185fa5; --front-bg: #e6f1fb;
+  --back: #534ab7; --back-bg: #eeedfe;
+  --sec: #993c1d; --sec-bg: #faece7;
+  --data: #0f6e56; --data-bg: #e1f5ee;
+  --host: #854f0b; --host-bg: #faeeda;
+  --font: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161513; --surface: #201f1c; --ink: #f1efe8; --muted: #a8a49c; --line: #34322e;
+  --front: #85b7eb; --front-bg: #0c2a47; --back: #afa9ec; --back-bg: #26215c;
+  --sec: #f0997b; --sec-bg: #4a1b0c; --data: #5dcaa5; --data-bg: #04342c; --host: #ef9f27; --host-bg: #412402;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #161513; --surface: #201f1c; --ink: #f1efe8; --muted: #a8a49c; --line: #34322e;
+  --front: #85b7eb; --front-bg: #0c2a47; --back: #afa9ec; --back-bg: #26215c;
+  --sec: #f0997b; --sec-bg: #4a1b0c; --data: #5dcaa5; --data-bg: #04342c; --host: #ef9f27; --host-bg: #412402;
+  color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font); margin: 0 }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 700; letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+.lede { color: var(--muted); margin: 6px 0 28px; max-width: 60ch }
+.label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted) }
+
+.path { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 28px }
+.path button { font: 500 13px var(--font); color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 999px; padding: 6px 12px; cursor: pointer }
+.path button:hover { border-color: var(--muted) }
+.path .arr { color: var(--muted); font-size: 14px }
+
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 24px }
+.chip { font: 500 13px var(--font); border-radius: 999px; padding: 7px 14px; cursor: pointer; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); display: inline-flex; align-items: center; gap: 8px }
+.chip .sw { width: 9px; height: 9px; border-radius: 3px; background: var(--c) }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+.search { margin-left: auto; min-width: 0; flex: 0 1 240px }
+.search input { width: 100%; font: 14px var(--font); padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink) }
+
+.layer { border-radius: 18px; padding: 18px; background: var(--lbg); margin-bottom: 18px; scroll-margin-top: 16px }
+.layer header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 14px }
+.layer h2 { font-size: 19px; font-weight: 650; margin: 0; color: var(--c) }
+.layer header p { margin: 0; color: var(--muted); font-size: 14px }
+.layer header .n { margin-left: auto; font: 12px var(--mono); color: var(--muted) }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px }
+.card { text-align: left; font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 16px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; min-width: 0 }
+.card:hover { border-color: var(--c) }
+.card[aria-expanded="true"] { border-color: var(--c); box-shadow: 0 0 0 1px var(--c) }
+.card b { font-size: 15px; font-weight: 600 }
+.card .what { font-size: 13px; color: var(--muted) }
+.card .us { font-size: 13.5px; color: var(--c); font-weight: 500 }
+.detail { grid-column: 1 / -1; background: var(--surface); border: 1px solid var(--c); border-radius: 12px; padding: 16px 18px;
+  display: grid; gap: 10px; min-width: 0 }
+.detail p { margin: 0; max-width: 75ch }
+.detail code { font: 12.5px var(--mono); background: var(--lbg); color: var(--c); padding: 2px 6px; border-radius: 6px; word-break: break-all }
+.detail .row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline }
+.empty { color: var(--muted); padding: 24px 0 }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px }
+.foot { color: var(--muted); font-size: 13px; margin-top: 28px }
+</style>
+
+<div class="wrap">
+  <div class="label">DesignFlow · how it's built</div>
+  <h1>Tech stack</h1>
+  <p class="lede">Every tool in the project, what it is, and what it does for us. Pick a layer, search, or click any card for the details and where it lives in the code.</p>
+
+  <div class="label">How data moves</div>
+  <nav class="path" id="path" aria-label="Data path"></nav>
+
+  <div class="bar">
+    <div id="chips" style="display:flex;flex-wrap:wrap;gap:8px" role="group" aria-label="Filter by layer"></div>
+    <label class="search"><span class="label" style="position:absolute;left:-9999px">Search tools</span>
+      <input id="q" type="search" placeholder="Search, e.g. Prisma" autocomplete="off"></label>
+  </div>
+
+  <main id="layers"></main>
+  <p class="foot">Versions come from the project's package.json files. Click the same card again to close its details.</p>
+</div>
+
+<script>
+const LAYERS = [
+  { id: "front", name: "Front end", sub: "What you see in the browser", tools: [
+    ["React 19", "Builds screens from reusable pieces", "StoryCard written once, shown 152 times",
+     "React splits the screen into components. The Board's story card, the Stage dropdown and the detail panels are each one component, reused wherever they're needed.", "apps/web/src/features/board/StoryCard.tsx"],
+    ["Vite 8", "Build tool and dev server", "Page updates the moment code is saved",
+     "In development Vite swaps changed code into the open page without a reload (port 5174). For production it bundles everything into small files the API serves.", "apps/web/vite.config.ts"],
+    ["Tailwind CSS 4", "Styling with short class names", "All colours, spacing and layout",
+     "Classes like rounded-2xl or p-5 style elements directly. The colour tokens (stage colours, danger red) are defined once and reused.", "apps/web/src/styles/index.css"],
+    ["shadcn + Radix", "Ready-made accessible UI parts", "Stage and Sort dropdowns, panels",
+     "Radix supplies the behaviour (keyboard, focus, screen readers); shadcn gives it our styling. The Select used for Stage, Sort and Teammate comes from here.", "apps/web/src/components/ui/Select.tsx"],
+    ["TanStack Query", "Fetches and remembers data", "Instant page switches, auto refresh",
+     "Asks the API for stories and metrics, caches the answers, and refreshes them when they get old, so switching between Overview and Board is instant.", "apps/web/src/api/workItems.ts"],
+    ["Recharts", "Chart library", "Bars and charts on the Overview",
+     "Draws the charts on the Overview, such as the delay warning bars.", "apps/web/src/features/overview/"],
+    ["React Router 7", "Page navigation without reloads", "Overview, Board, story pages",
+     "Maps addresses like /projects/…/board or /work-items/302446 to screens, inside the browser.", "apps/web/src/app/"],
+    ["Geist", "Typeface", "All text and the bold numbers",
+     "One font family for the whole app, bundled with it so nothing loads from outside. Geist Mono is used for IDs.", "apps/web/src/main.tsx"],
+  ]},
+  { id: "back", name: "Back end", sub: "The API server behind the app", tools: [
+    ["Node 22", "Runs TypeScript on a server", "The engine the API runs on",
+     "The runtime for the API. It listens on port 3000, only on this machine in development.", "apps/api/src/main.ts"],
+    ["NestJS 11", "Organises server code into modules", "Sync, metrics, auth, admin kept apart",
+     "Each area (sync, metrics, work items, auth, admin, tasks) is its own module with a controller for the URLs and a service for the logic.", "apps/api/src/app.module.ts"],
+    ["Prisma 7", "Database toolkit (ORM)", "Reads/writes data; migrations shape tables",
+     "Lets the API read and write PostgreSQL in TypeScript instead of raw SQL. The schema file describes every table, and migrations apply changes the same way on every machine.", "apps/api/prisma/schema.prisma"],
+    ["Zod 4", "Checks data has the right shape", "Rejects bad input and odd Azure replies",
+     "Every Azure DevOps response and every request to our API is checked against a schema. Unexpected data is rejected before it can be stored. Settings in .env are checked at startup too.", "apps/api/src/ado/ado.schemas.ts"],
+    ["Pino", "Fast structured logger", "Records syncs and errors for tracing",
+     "Writes each event (sync started, items fetched, errors) as a structured line with a request id, so a problem can be traced end to end.", "apps/api/src/app.module.ts"],
+  ]},
+  { id: "sec", name: "Security", sub: "Who gets in and what's blocked", tools: [
+    ["Helmet", "Security headers on every page", "Blocks framing and injected scripts",
+     "Adds headers telling the browser to refuse being embedded in other sites, to run only our own scripts, and to use HTTPS when hosted.", "apps/api/src/http-security.ts"],
+    ["CSRF tokens", "Secret sent with every change", "Other sites can't act as you",
+     "Every request that changes something (run a sync, dismiss a delay) must carry a secret token from your session. Another website can't know it, so it can't act in your name.", "apps/api/src/common/guards.ts"],
+    ["Sessions", "Server-side record of who's signed in", "Ends after 30 min idle or 8 hours",
+     "Your browser only holds a random cookie. Who you are is stored in PostgreSQL and expires after 30 idle minutes or 8 hours.", "apps/api/src/auth/prisma-session.store.ts"],
+    ["MSAL", "Microsoft sign-in library", "Sign in with Microsoft, @cspl.com only",
+     "Handles the Microsoft login flow when DesignFlow is hosted. Only company accounts are let in.", "apps/api/src/auth/"],
+    ["Entra ID", "Company Microsoft accounts", "IT controls who has access",
+     "Microsoft's directory of company accounts. Your office login is your DesignFlow login; leaving the company removes access automatically.", "docs/DEPLOYMENT.md"],
+    ["Key Vault", "Azure's safe for secrets", "Passwords and keys never in files",
+     "When hosted, the database password, session secret and Azure DevOps access are read from Key Vault instead of a .env file.", "docs/DEPLOYMENT.md"],
+  ]},
+  { id: "data", name: "Data", sub: "Where it comes from and lives", tools: [
+    ["PostgreSQL 17", "The database", "Azure copy, metrics, our own data",
+     "Holds three groups: a copy of Azure DevOps (stories, every change, comments, parents), numbers computed from it, and DesignFlow's own data (sessions, delay reasons, tasks, audit log).", "apps/api/prisma/schema.prisma"],
+    ["Azure DevOps API", "Microsoft's boards interface", "Our source: read-only, never edited",
+     "We read projects, teams, sprints, stories, their history, comments and links. Nothing is ever written back, so a read-only token is enough.", "apps/api/src/ado/ado.client.ts"],
+    ["Sync job", "Background task every 10 seconds", "Fetches only what changed",
+     "Asks Azure DevOps for changes since the last bookmark, saves them, then recomputes metrics for just those stories. The first run loads all UX Team stories in about a minute.", "apps/api/src/sync/sync.service.ts"],
+    ["UTC dates", "One universal time zone", "Stored once, shown in local time",
+     "Dates are saved exactly as Azure DevOps sends them, in UTC, and converted to your local time only when shown.", "apps/web/src/lib/format.ts"],
+  ]},
+  { id: "host", name: "Hosting and quality", sub: "How it ships and stays healthy", tools: [
+    ["TypeScript", "JavaScript with types", "Catches mistakes before the app runs",
+     "Every part of the project is TypeScript. Passing a date where a name is expected fails before anything runs.", "tsconfig files in each app"],
+    ["npm workspaces", "Several projects in one repo", "Web, API, shared code installed together",
+     "apps/web, apps/api and packages/shared live in one repository and install with one npm install. Shared types keep web and API in agreement.", "package.json"],
+    ["Docker", "Packs the app into one image", "Runs the same everywhere",
+     "One image contains the API and the built web pages, served together on port 3000.", "Dockerfile"],
+    ["Azure App Service", "Managed hosting", "HTTPS, restarts, scaling handled",
+     "Where the image runs once hosted. Azure handles certificates, restarts and health checks (/api/health/live).", "docs/DEPLOYMENT.md"],
+    ["Jest + Vitest", "Automated tests", "56 API and 42 web tests",
+     "Jest tests the API (security rules, sync, metrics); Vitest tests the web app. Run before every change is kept.", "apps/api/test, apps/web/src/**/*.test.tsx"],
+    ["ESLint + Prettier", "Code checker and formatter", "Clean, consistent code",
+     "ESLint flags risky code, including security patterns; Prettier formats every file the same way.", "eslint.config.*, .prettierrc"],
+  ]},
+];
+const PATH = [["Browser", "front"], ["Web app", "front"], ["API server", "back"], ["PostgreSQL", "data"], ["Sync", "data"], ["Azure DevOps", "data"]];
+
+let filter = "all", open = null;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const vars = (id) => `--c: var(--${id}); --lbg: var(--${id}-bg)`;
+
+$("path").innerHTML = PATH.map(([n, l], i) =>
+  (i ? '<span class="arr" aria-hidden="true">←</span>' : "") +
+  `<button type="button" data-layer="${l}" style="${vars(l)}">${n}</button>`).join("");
+$("path").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  setFilter(b.dataset.layer);
+  $("layer-" + b.dataset.layer)?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+});
+
+function renderChips() {
+  $("chips").innerHTML = [["all", "All layers"], ...LAYERS.map((l) => [l.id, l.name])].map(([id, n]) =>
+    `<button type="button" class="chip" data-id="${id}" aria-pressed="${filter === id}" style="${id === "all" ? "--c: var(--muted)" : vars(id)}">` +
+    `<span class="sw" aria-hidden="true"></span>${n}</button>`).join("");
+}
+$("chips").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setFilter(b.dataset.id); });
+$("q").addEventListener("input", render);
+function setFilter(id) { filter = id; try { localStorage.setItem("stack.filter", id); } catch {} renderChips(); render(); }
+
+function render() {
+  const q = $("q").value.trim().toLowerCase();
+  let html = "";
+  for (const l of LAYERS) {
+    if (filter !== "all" && filter !== l.id) continue;
+    const tools = l.tools.filter((t) => !q || t.join(" ").toLowerCase().includes(q));
+    if (!tools.length) continue;
+    html += `<section class="layer" id="layer-${l.id}" style="${vars(l.id)}"><header><h2>${l.name}</h2><p>${l.sub}</p>` +
+      `<span class="n">${tools.length} tool${tools.length > 1 ? "s" : ""}</span></header><div class="grid">`;
+    tools.forEach((t, i) => {
+      const key = l.id + ":" + t[0], isOpen = open === key;
+      html += `<button type="button" class="card" data-key="${esc(key)}" aria-expanded="${isOpen}">` +
+        `<b>${esc(t[0])}</b><span class="what">${esc(t[1])}</span><span class="us">${esc(t[2])}</span></button>`;
+      const endOfRow = isOpen;
+      if (endOfRow) html += `<div class="detail"><p>${esc(t[3])}</p>` +
+        `<div class="row"><span class="label">Where in our code</span><code>${esc(t[4])}</code></div></div>`;
+    });
+    html += "</div></section>";
+  }
+  $("layers").innerHTML = html || '<p class="empty">No tool matches that search. Try a shorter word.</p>';
+}
+$("layers").addEventListener("click", (e) => {
+  const c = e.target.closest(".card"); if (!c) return;
+  open = open === c.dataset.key ? null : c.dataset.key; render();
+  document.querySelector(`.card[data-key="${CSS.escape(c.dataset.key)}"]`)?.focus();
+});
+
+try { const f = localStorage.getItem("stack.filter"); if (f && (f === "all" || LAYERS.some((l) => l.id === f))) filter = f; } catch {}
+renderChips(); render();
+</script>

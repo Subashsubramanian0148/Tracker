@@ -86,7 +86,12 @@ function Detail({ item, projectId }: { item: WorkItemDetail; projectId: string }
   const location = useLocation();
   // The delay-reason form stays closed until asked for (or deep-linked).
   const [formOpen, setFormOpen] = useState(location.hash === '#delay-reason');
-  const url = safeExternalUrl(item.url);
+  // The parent item (Related Work → Parent) when there is one, otherwise the story itself.
+  const url = safeExternalUrl(
+    item.parentId && item.url
+      ? item.url.replace(/\/_workitems\/edit\/\d+$/, `/_workitems/edit/${item.parentId}`)
+      : item.url,
+  );
   const canAdd = canAddDelayReason(me.user, item.assignedTo);
   const base = `/projects/${encodeURIComponent(projectId)}`;
   const hasHistory = item.timeInState.some((t) => t.hours > 0);
@@ -141,7 +146,7 @@ function Detail({ item, projectId }: { item: WorkItemDetail; projectId: string }
             rel="noopener noreferrer"
             className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-line px-3 text-[13px] font-medium text-ink-soft hover:bg-sidebar hover:text-ink"
           >
-            Open in Azure DevOps
+            {item.parentId ? 'Open parent in Azure DevOps' : 'Open in Azure DevOps'}
             <ExternalLink aria-hidden className="size-3.5" />
             <span className="sr-only">(opens in a new tab)</span>
           </a>
@@ -341,7 +346,12 @@ function Detail({ item, projectId }: { item: WorkItemDetail; projectId: string }
           <Stat label="Finished on">{done ? formatShortDate(item.completedDate) : '—'}</Stat>
           <Stat label="Time spent working">{plainDays(item.cycleTimeDays)}</Stat>
           <Stat label="From request to done">{plainDays(item.leadTimeDays)}</Stat>
-          <Stat label="Sprint">{sprint ?? '—'}</Stat>
+          <Stat label="Sprint">
+            {sprint ?? '—'}
+            {sprint && item.iterationFromParent && (
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">from parent</span>
+            )}
+          </Stat>
           <Stat label="Size">{item.effort !== null ? `${item.effort} points` : '—'}</Stat>
           <Stat label="Time stuck">
             {item.blockedHours > 0 ? plainHours(item.blockedHours) : 'Never'}
@@ -638,8 +648,12 @@ function buildDataIssues(item: WorkItemDetail, figma: string | null) {
     Date.parse(item.activatedDate) > Date.parse(item.dueDate)
   ) {
     issues.push({
-      text: 'Started after its sprint had ended.',
-      fix: 'Set the Iteration field in Azure DevOps to the sprint it is really in.',
+      text: item.iterationFromParent
+        ? 'Started after its parent’s sprint had ended.'
+        : 'Started after its sprint had ended.',
+      fix: item.iterationFromParent
+        ? 'This story has no sprint of its own, so it uses its parent’s. Set this story’s Iteration in Azure DevOps to the sprint it is really in.'
+        : 'Set the Iteration field in Azure DevOps to the sprint it is really in.',
     });
   }
   if (!item.assignedTo)

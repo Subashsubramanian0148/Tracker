@@ -12,14 +12,18 @@ import {
   boardsResponse,
   commentsResponse,
   type AdoComment,
+  iterationNodeResponse,
   iterationsResponse,
   projectsResponse,
   reportingRevisionsResponse,
   teamFieldValuesResponse,
   teamMembersResponse,
   teamsResponse,
+  wiqlResponse,
+  workItemRevisionsResponse,
   workItemTypeStatesResponse,
   workItemTypesResponse,
+  workItemIterationResponse,
   workItemRelationsResponse,
 } from './ado.schemas';
 import { REVISION_FIELDS } from './fields';
@@ -174,6 +178,44 @@ export class AdoClient {
     );
   }
 
+  /** Ids of work items under the given area paths changed since `since` (WIQL caps at 20,000). */
+  async queryIdsInAreas(
+    projectId: string,
+    areas: { areaPath: string; includeChildren: boolean }[],
+    since: Date,
+  ): Promise<number[]> {
+    if (areas.length === 0) return [];
+    const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
+    const where = areas
+      .map((a) => `[System.AreaPath] ${a.includeChildren ? 'UNDER' : '='} ${quote(a.areaPath)}`)
+      .join(' OR ');
+    const res = await this.request(
+      'POST',
+      `${seg(projectId)}/_apis/wit/wiql`,
+      { $top: '20000' },
+      wiqlResponse,
+      { kind: 'service' },
+      {
+        query: `SELECT [System.Id] FROM WorkItems WHERE (${where}) AND [System.ChangedDate] >= ${quote(since.toISOString().slice(0, 10))}`,
+      },
+    );
+    return res.workItems.map((w) => w.id);
+  }
+
+  /** Every revision of one work item, oldest first. */
+  async listWorkItemRevisions(projectId: string, workItemId: number) {
+    const all: z.infer<typeof workItemRevisionsResponse>['value'] = [];
+    for (let skip = 0; ; skip += 200) {
+      const res = await this.get(
+        `${seg(projectId)}/_apis/wit/workItems/${workItemId}/revisions`,
+        { $top: '200', $skip: String(skip) },
+        workItemRevisionsResponse,
+      );
+      all.push(...res.value);
+      if (res.value.length < 200) return all;
+    }
+  }
+
   /** Every comment on one work item, oldest first (deleted ones skipped). */
   async listComments(projectId: string, workItemId: number): Promise<AdoComment[]> {
     const all: AdoComment[] = [];
@@ -196,20 +238,77 @@ export class AdoClient {
     return all;
   }
 
-  /** Files attached to one work item (name, link and size), from its relations. */
-  async listAttachments(projectId: string, workItemId: number) {
+  /**
+   * One work item's links: attached files (name, link and size) and its parent (Related Work →
+   * Parent). The parent is read here because revision history doesn't include System.Parent.
+   */
+  async listRelations(projectId: string, workItemId: number) {
     const res = await this.get(
       `${seg(projectId)}/_apis/wit/workitems/${workItemId}`,
       { $expand: 'relations' },
       workItemRelationsResponse,
     );
-    return (res.relations ?? [])
-      .filter((r) => r.rel === 'AttachedFile' && r.url.startsWith('https://'))
-      .map((r) => ({
-        url: r.url,
-        name: r.attributes?.name ?? 'Attachment',
-        sizeBytes: r.attributes?.resourceSize ?? null,
-      }));
+    const relations = res.relations ?? [];
+    const parent = relations.find((r) => r.rel === 'System.LinkTypes.Hierarchy-Reverse');
+    const parentId = Number(/\/workItems\/(\d+)$/i.exec(parent?.url ?? '')?.[1]);
+    return {
+      parentId: Number.isSafeInteger(parentId) ? parentId : null,
+      attachments: relations
+        .filter((r) => r.rel === 'AttachedFile' && r.url.startsWith('https://'))
+        .map((r) => ({
+          url: r.url,
+          name: r.attributes?.name ?? 'Attachment',
+          sizeBytes: r.attributes?.resourceSize ?? null,
+        })),
+    };
+  }
+
+  /**
+   * Every iteration in the project with its dates, flattened. Paths are returned in the same
+   * form as a work item's Iteration field ("CORE 2.0\\Sprint 30"), not the node form
+   * ("\\CORE 2.0\\Iteration\\Sprint 30").
+   */
+  async listProjectIterations(projectId: string) {
+    const root = await this.get(
+      `${seg(projectId)}/_apis/wit/classificationnodes/Iterations`,
+      { $depth: '10' },
+      iterationNodeResponse,
+    );
+    const out: {
+      id: string;
+      name: string;
+      path: string;
+      startDate?: string | null;
+      finishDate?: string | null;
+    }[] = [];
+    const walk = (n: typeof root) => {
+      const parts = n.path.split('\\').filter(Boolean);
+      if (parts[1] === 'Iteration') parts.splice(1, 1);
+      out.push({
+        id: n.identifier,
+        name: n.name,
+        path: parts.join('\\'),
+        startDate: n.attributes?.startDate,
+        finishDate: n.attributes?.finishDate,
+      });
+      n.children?.forEach(walk);
+    };
+    walk(root);
+    return out;
+  }
+
+  /** A work item's Iteration path, or null when it can't be read (e.g. it lives in another project). */
+  async getIterationPath(projectId: string, workItemId: number): Promise<string | null> {
+    try {
+      const res = await this.get(
+        `${seg(projectId)}/_apis/wit/workitems/${workItemId}`,
+        { fields: 'System.IterationPath' },
+        workItemIterationResponse,
+      );
+      return res.fields['System.IterationPath'] ?? null;
+    } catch {
+      return null;
+    }
   }
 
   workItemUrl(projectName: string, id: number): string {

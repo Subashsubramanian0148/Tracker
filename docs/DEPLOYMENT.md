@@ -239,7 +239,7 @@ Bicep creates secret **names only**; values are set by a member of the secrets-o
 |---|---|---|
 | `database-url` | app → `DATABASE_URL` | `postgresql://ado_metrics_app:<pw>@<postgresFqdn>:5432/ado_metrics?sslmode=verify-full` |
 | `migrator-database-url` | migration job → `DATABASE_URL` | `postgresql://ado_metrics_migrator:<pw>@<postgresFqdn>:5432/ado_metrics?sslmode=require` |
-| `session-secret` | app → `SESSION_SECRET` | ≥ 32 random characters |
+| `session-secret` | app → `SESSION_SECRET` | ≥ 64 random characters (`openssl rand -base64 48`) |
 | `entra-client-secret` | app → `ENTRA_CLIENT_SECRET` | from section 3 |
 | `webhook-basic-password` | app → `WEBHOOK_BASIC_PASSWORD` | random; only used if the HTTP webhook is exposed via Front Door |
 | `postgres-admin-password` | humans (break-glass) | the Phase 1 admin password |
@@ -494,12 +494,13 @@ All configuration is environment variables. Values in **bold** are set by Bicep;
 |---|---|---|
 | `NODE_ENV` | **`production`** | also baked into the image |
 | `PORT` | **`3000`** | ingress target port |
+| `HOST` | `0.0.0.0` | set in the image; defaults to 127.0.0.1 elsewhere |
 | `LOG_LEVEL` | **`info`** (`logLevel`) | |
 | `PUBLIC_BASE_URL` | **`publicBaseUrl`** | used for redirect URIs and absolute links |
 | `STATIC_DIR` | `/app/apps/web/dist` | set in the image |
 | `TRUST_PROXY_HOPS` | **`1`** (`2` with Front Door) | Container Apps Envoy is one hop |
 | `DATABASE_URL` | Key Vault `database-url` | `sslmode=verify-full` |
-| `SESSION_SECRET` | Key Vault `session-secret` | ≥ 32 chars |
+| `SESSION_SECRET` | Key Vault `session-secret` | ≥ 64 chars |
 | `AUTH_MODE` | **`entra`** | `dev` only in docker compose |
 | `ENTRA_TENANT_ID` / `ENTRA_CLIENT_ID` | **parameters** | |
 | `ENTRA_CLIENT_SECRET` | Key Vault `entra-client-secret` | |

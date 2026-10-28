@@ -140,6 +140,8 @@ model WorkItem {
   iterationPath      String?   @map("iteration_path")
   areaPath           String?   @map("area_path")
   parentId           Int?      @map("parent_id")
+  /// Parent's Iteration, used as this item's sprint when its own Iteration has no sprint.
+  parentIterationPath String?  @map("parent_iteration_path")
   tags               String[]
   effort             Float?
   originalEstimate   Float?    @map("original_estimate")

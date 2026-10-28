@@ -8,6 +8,7 @@ import { detectDelays, type SprintWindow } from './engine/delays';
 import { analyzeHistory, type CategoryResolver } from './engine/history';
 import { DAY_MS, percentile } from './engine/stats';
 import { buildCategoryResolver } from './state-categories';
+import { effectiveIteration } from '../work-items/mappers';
 
 export interface LatestText {
   rev: number;
@@ -50,6 +51,22 @@ export class WorkItemProcessor {
         where: { workItemId: { in: chunk } },
         orderBy: [{ workItemId: 'asc' }, { rev: 'asc' }],
       });
+      const parentSprint = new Map(
+        (
+          await this.prisma.workItem.findMany({
+            where: { id: { in: chunk } },
+            select: { id: true, parentIterationPath: true },
+          })
+        ).map((w) => [w.id, w.parentIterationPath]),
+      );
+      const finishByPath = new Map(
+        (
+          await this.prisma.iteration.findMany({
+            where: { projectId, finishDate: { not: null } },
+            select: { path: true, finishDate: true },
+          })
+        ).map((it) => [it.path, it.finishDate!]),
+      );
       const byItem = new Map<number, typeof revisions>();
       for (const r of revisions) {
         const list = byItem.get(r.workItemId) ?? [];
@@ -67,6 +84,27 @@ export class WorkItemProcessor {
               snapshot: r.fields as unknown as RevisionSnapshot,
             }));
             const h = analyzeHistory(inputs, categoryOf, now);
+            // When the item has no sprint of its own, or its sprint ended before work started,
+            // it counts in its parent's sprint (see effectiveIteration). Only
+            // the sprint history uses this; the change log keeps the item's real Iteration.
+            const parentPath = parentSprint.get(id) ?? null;
+            const sprintInputs = inputs.map((r) => ({
+              ...r,
+              snapshot: {
+                ...r.snapshot,
+                iterationPath: effectiveIteration(
+                  {
+                    iterationPath: r.snapshot.iterationPath,
+                    parentIterationPath: parentPath,
+                    activatedDate: h.activatedDate,
+                  },
+                  finishByPath,
+                ).path,
+              },
+            }));
+            const intervals = parentPath
+              ? analyzeHistory(sprintInputs, categoryOf, now).intervals
+              : h.intervals;
             const latest = inputs[inputs.length - 1]!;
             const s = latest.snapshot;
             const text = latestText.get(id);
@@ -85,7 +123,8 @@ export class WorkItemProcessor {
               assignedToId: s.assignedTo?.id ?? null,
               iterationPath: s.iterationPath,
               areaPath: s.areaPath,
-              parentId: s.parentId,
+              // History rarely carries the parent; the sync sets it from the item's links instead.
+              ...(s.parentId != null ? { parentId: s.parentId } : {}),
               tags: s.tags,
               effort: s.effort,
               originalEstimate: s.originalEstimate,
@@ -116,7 +155,7 @@ export class WorkItemProcessor {
               data: h.segments.map((seg) => ({ workItemId: id, projectId, ...seg })),
             });
             await tx.iterationInterval.createMany({
-              data: h.intervals.map((iv) => ({ workItemId: id, projectId, ...iv })),
+              data: intervals.map((iv) => ({ workItemId: id, projectId, ...iv })),
             });
             await tx.workItemChange.createMany({
               data: h.changes.map((c) => ({ workItemId: id, projectId, ...c })),
@@ -170,6 +209,7 @@ export class WorkItemProcessor {
       ]),
     );
 
+    const finishByPath = new Map([...sprintsByPath].map(([path, s]) => [path, s.finishDate]));
     const items = await this.prisma.workItem.findMany({
       where: {
         projectId,
@@ -181,6 +221,7 @@ export class WorkItemProcessor {
         type: true,
         stateCategory: true,
         iterationPath: true,
+        parentIterationPath: true,
         activatedDate: true,
         completedDate: true,
         cycleTimeHours: true,
@@ -210,6 +251,7 @@ export class WorkItemProcessor {
       const ignored = new Set(raw.signalOverrides.map((o) => o.commentId));
       const item = {
         ...raw,
+        iterationPath: effectiveIteration(raw, finishByPath).path,
         comments: raw.comments.map((c) => (ignored.has(c.commentId) ? { ...c, signals: [] } : c)),
       };
       const commentHours = Math.round(

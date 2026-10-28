@@ -196,6 +196,8 @@ export interface WorkItemSummary {
   boardColumn: string | null;
   assignedTo: PersonRef | null;
   iterationPath: string | null;
+  /** True when the item has no sprint of its own and iterationPath is its parent's sprint. */
+  iterationFromParent: boolean;
   areaPath: string | null;
   effort: number | null;
   tags: string[];

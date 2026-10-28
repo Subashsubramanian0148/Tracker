@@ -133,8 +133,8 @@ export class AuthController {
   /** Local development: no chooser, sign straight in as the one dev user. */
   @Get('dev')
   @Public()
-  devEntry(@Query('returnTo') returnTo: unknown, @Res() res: Response): void {
-    this.assertDevMode();
+  devEntry(@Query('returnTo') returnTo: unknown, @Req() req: Request, @Res() res: Response): void {
+    this.assertDevMode(req);
     res.redirect(302, `/api/auth/dev/login?returnTo=${encodeURIComponent(safeReturnTo(returnTo))}`);
   }
 
@@ -152,7 +152,7 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    this.assertDevMode();
+    this.assertDevMode(req);
     const user = DEV_USER;
     const projects = await this.prisma.project.findMany({ select: { id: true } });
     await this.establishSession(
@@ -170,8 +170,12 @@ export class AuthController {
     res.redirect(302, safeReturnTo(returnTo));
   }
 
-  private assertDevMode() {
-    if (this.config.AUTH_MODE !== 'dev' || this.config.isProduction) throw new NotFoundException();
+  /** Passwordless, so only for requests from this machine (the socket address, not X-Forwarded-For). */
+  private assertDevMode(req: Request) {
+    const from = req.socket.remoteAddress ?? '';
+    const local = from === '::1' || from.startsWith('127.') || from.startsWith('::ffff:127.');
+    if (this.config.AUTH_MODE !== 'dev' || this.config.isProduction || !local)
+      throw new NotFoundException();
   }
 
   /** New session id on every sign-in prevents session fixation. */

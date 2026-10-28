@@ -10,7 +10,7 @@ import {
   SheetTitle,
 } from '@/components/shadcn/sheet';
 import { Avatar } from '../../components/ui/Avatar';
-import { SegmentedControl } from '../../components/ui/SegmentedControl';
+import { Select } from '../../components/ui/Select';
 import { formatNumber, typeShortCode } from '../../lib/format';
 import { delayFlagLabel } from '../../lib/labels';
 
@@ -118,11 +118,13 @@ function Detail({
         <SheetDescription>{COPY[kind].description}</SheetDescription>
         {groups.length > 0 ? (
           <div className="pt-3">
-            <SegmentedControl
-              label="Show"
+            <Select
+              label={kind === 'people' ? 'Teammate' : 'Show'}
+              hideLabel
               value={group!.key}
               onChange={setGroupKey}
               options={options}
+              triggerClassName="w-full sm:w-72"
             />
           </div>
         ) : null}

@@ -35,8 +35,18 @@ const baseEnv = {
   SYNC_DISABLED: 'true',
 };
 
-const viewer: SessionUser = { id: 'u-viewer', displayName: 'V', email: 'v@contoso.dev', roles: ['Viewer'] };
-const admin: SessionUser = { id: 'u-admin', displayName: 'A', email: 'a@contoso.dev', roles: ['Admin'] };
+const viewer: SessionUser = {
+  id: 'u-viewer',
+  displayName: 'V',
+  email: 'v@contoso.dev',
+  roles: ['Viewer'],
+};
+const admin: SessionUser = {
+  id: 'u-admin',
+  displayName: 'A',
+  email: 'a@contoso.dev',
+  roles: ['Admin'],
+};
 
 @Controller()
 class ProbeController {
@@ -92,7 +102,13 @@ function fakePrisma() {
   return {
     session: {
       findUnique: async ({ where }: { where: { sid: string } }) => sessions.get(where.sid) ?? null,
-      upsert: async ({ where, create }: { where: { sid: string }; create: { sid: string; data: unknown; expiresAt: Date } }) => {
+      upsert: async ({
+        where,
+        create,
+      }: {
+        where: { sid: string };
+        create: { sid: string; data: unknown; expiresAt: Date };
+      }) => {
         sessions.set(where.sid, create);
       },
       updateMany: async () => ({ count: 1 }),
@@ -125,7 +141,10 @@ async function buildApp(env: Record<string, string> = {}) {
   class TestModule {}
 
   const moduleRef = await Test.createTestingModule({ imports: [TestModule] }).compile();
-  const app = moduleRef.createNestApplication<NestExpressApplication>({ bodyParser: false, logger: false });
+  const app = moduleRef.createNestApplication<NestExpressApplication>({
+    bodyParser: false,
+    logger: false,
+  });
   configureHttp(app, config);
   await app.init();
   return { app, audit };
@@ -206,7 +225,9 @@ describe('HTTP security', () => {
   it('enforces roles and records denials in the audit log', async () => {
     const agent = await signIn(app, 'viewer');
     await agent.get('/api/admin-only').expect(403);
-    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'authz.denied', outcome: 'denied' }));
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'authz.denied', outcome: 'denied' }),
+    );
     const adminAgent = await signIn(app, 'admin');
     await adminAgent.get('/api/admin-only').expect(200);
   });
@@ -253,7 +274,11 @@ describe('HTTP security', () => {
 });
 
 describe('configuration guard rails', () => {
-  const prod = { ...baseEnv, NODE_ENV: 'production', PUBLIC_BASE_URL: 'https://metrics.contoso.com' };
+  const prod = {
+    ...baseEnv,
+    NODE_ENV: 'production',
+    PUBLIC_BASE_URL: 'https://metrics.contoso.com',
+  };
 
   it('refuses dev auth and PAT auth in production', () => {
     expect(() => loadConfig(prod)).toThrow(/AUTH_MODE.*not allowed in production/s);
@@ -271,14 +296,49 @@ describe('configuration guard rails', () => {
   it('requires https and a strong session secret', () => {
     expect(() => loadConfig({ ...baseEnv, SESSION_SECRET: 'short' })).toThrow(/SESSION_SECRET/);
     expect(() =>
-      loadConfig({ ...prod, PUBLIC_BASE_URL: 'http://metrics.contoso.com', AUTH_MODE: 'entra', ADO_AUTH: 'managed-identity' }),
+      loadConfig({
+        ...prod,
+        PUBLIC_BASE_URL: 'http://metrics.contoso.com',
+        AUTH_MODE: 'entra',
+        ADO_AUTH: 'managed-identity',
+      }),
     ).toThrow(/must be https/);
+  });
+
+  it('keeps passwordless dev sign-in on this machine only', () => {
+    expect(loadConfig(baseEnv).HOST).toBe('127.0.0.1');
+    expect(() => loadConfig({ ...baseEnv, HOST: '0.0.0.0' })).toThrow(/HOST/);
+  });
+
+  it('requires a verified database certificate and a 64-character secret in production', () => {
+    const entra = {
+      ...prod,
+      AUTH_MODE: 'entra',
+      ADO_AUTH: 'managed-identity',
+      ENTRA_TENANT_ID: '11111111-1111-4111-8111-111111111111',
+      ENTRA_CLIENT_ID: '22222222-2222-4222-8222-222222222222',
+      ENTRA_CLIENT_SECRET: 's',
+      HOST: '0.0.0.0',
+      SESSION_SECRET: 'x'.repeat(64),
+      DATABASE_URL: 'postgresql://u:p@db.example:5432/db?sslmode=verify-full',
+    };
+    expect(() => loadConfig(entra)).not.toThrow();
+    expect(() =>
+      loadConfig({ ...entra, DATABASE_URL: 'postgresql://u:p@db.example:5432/db?sslmode=require' }),
+    ).toThrow(/verify-full/);
+    expect(() => loadConfig({ ...entra, SESSION_SECRET: 'x'.repeat(48) })).toThrow(/64/);
   });
 
   it('only accepts an https Service Bus queue URL for the change queue', () => {
     const sb = { ...baseEnv, CHANGE_QUEUE_KIND: 'servicebus' };
-    expect(() => loadConfig({ ...sb, CHANGE_QUEUE_URL: 'https://ns1.servicebus.windows.net/ado-changes' })).not.toThrow();
-    for (const bad of ['http://ns1.servicebus.windows.net/q', 'https://evil.example/q', 'https://ns1.servicebus.windows.net/']) {
+    expect(() =>
+      loadConfig({ ...sb, CHANGE_QUEUE_URL: 'https://ns1.servicebus.windows.net/ado-changes' }),
+    ).not.toThrow();
+    for (const bad of [
+      'http://ns1.servicebus.windows.net/q',
+      'https://evil.example/q',
+      'https://ns1.servicebus.windows.net/',
+    ]) {
       expect(() => loadConfig({ ...sb, CHANGE_QUEUE_URL: bad })).toThrow(/CHANGE_QUEUE_URL/);
     }
     expect(parseServiceBusUrl('https://ns1.servicebus.windows.net/ado-changes')).toEqual({
@@ -299,18 +359,44 @@ describe('configuration guard rails', () => {
 describe('input handling helpers', () => {
   it('only allows same-origin relative return paths', () => {
     expect(safeReturnTo('/projects/abc/board?x=1')).toBe('/projects/abc/board?x=1');
-    for (const bad of ['https://evil.example', '//evil.example', '/\\evil.example', 'javascript:alert(1)', '/api/auth/logout', '/ok\r\nSet-Cookie: x', 42]) {
+    for (const bad of [
+      'https://evil.example',
+      '//evil.example',
+      '/\\evil.example',
+      'javascript:alert(1)',
+      '/api/auth/logout',
+      '/ok\r\nSet-Cookie: x',
+      42,
+    ]) {
       expect(safeReturnTo(bad)).toBe('/');
     }
   });
 
   it('extracts the project id only from well-formed work item service hooks', () => {
-    expect(projectIdFromServiceHook({ eventType: 'workitem.updated', resourceContainers: { project: { id: PROJECT } } })).toBe(PROJECT);
-    expect(projectIdFromServiceHook({ eventType: 'git.push', resourceContainers: { project: { id: PROJECT } } })).toBeNull();
-    expect(projectIdFromServiceHook({ eventType: 'workitem.updated', resourceContainers: { project: { id: "1' OR 1=1" } } })).toBeNull();
+    expect(
+      projectIdFromServiceHook({
+        eventType: 'workitem.updated',
+        resourceContainers: { project: { id: PROJECT } },
+      }),
+    ).toBe(PROJECT);
+    expect(
+      projectIdFromServiceHook({
+        eventType: 'git.push',
+        resourceContainers: { project: { id: PROJECT } },
+      }),
+    ).toBeNull();
+    expect(
+      projectIdFromServiceHook({
+        eventType: 'workitem.updated',
+        resourceContainers: { project: { id: "1' OR 1=1" } },
+      }),
+    ).toBeNull();
     expect(projectIdFromServiceHook('garbage')).toBeNull();
     // Service Bus delivers the same hook as an object, a string or bytes depending on the sender.
-    const hook = { eventType: 'workitem.updated', resourceContainers: { project: { id: PROJECT } } };
+    const hook = {
+      eventType: 'workitem.updated',
+      resourceContainers: { project: { id: PROJECT } },
+    };
     for (const body of [hook, JSON.stringify(hook), Buffer.from(JSON.stringify(hook))]) {
       expect(projectIdFromServiceHook(JSON.parse(bodyText(body)!))).toBe(PROJECT);
     }

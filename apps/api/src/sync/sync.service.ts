@@ -1,3 +1,4 @@
+import type { ReportingRevision } from '../ado/ado.schemas';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { SyncRun as SyncRunDto, Paged } from '@ado-metrics/shared';
 import { AdoClient } from '../ado/ado.client';
@@ -15,6 +16,7 @@ import { DAY_MS } from '../metrics/engine/stats';
 import { WorkItemProcessor, type LatestText } from '../metrics/work-item-processor.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobLeaseService } from './job-lease.service';
+import { SPRINT_SEPARATOR } from '../work-items/mappers';
 
 export type SyncTrigger = SyncRunDto['trigger'];
 export interface SyncOptions {
@@ -37,6 +39,8 @@ const METADATA_MAX_AGE_MS = 60 * 60_000;
 export class SyncService {
   private readonly logger = new Logger(SyncService.name);
   private readonly metadataRefreshedAt = new Map<string, number>();
+  /** The lease is re-entrant for this instance, so overlapping local runs are blocked here. */
+  private running = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -54,6 +58,10 @@ export class SyncService {
     trigger: SyncTrigger,
     opts: SyncOptions = {},
   ): Promise<{ run: SyncRunDto; done: Promise<SyncRunDto> } | null> {
+    if (this.running) {
+      this.logger.debug({ trigger }, 'Sync skipped: a sync is already running here');
+      return null;
+    }
     if (!(await this.lease.acquire(LEASE, LEASE_TTL_MS))) {
       this.logger.log({ trigger }, 'Sync skipped: another instance holds the lease');
       return null;
@@ -63,7 +71,9 @@ export class SyncService {
       () => void this.lease.acquire(LEASE, LEASE_TTL_MS).catch(() => undefined),
       LEASE_TTL_MS / 3,
     );
+    this.running = true;
     const release = async () => {
+      this.running = false;
       clearInterval(heartbeat);
       await this.lease.release(LEASE).catch(() => undefined);
     };
@@ -322,66 +332,83 @@ export class SyncService {
   private async syncRevisions(projectId: string, full: boolean) {
     const project = await this.prisma.project.findUniqueOrThrow({ where: { id: projectId } });
     let token = full ? undefined : (project.revisionsContinuationToken ?? undefined);
-    const startDateTime = new Date(Date.now() - this.config.SYNC_LOOKBACK_DAYS * DAY_MS);
+    let startDateTime = new Date(Date.now() - this.config.SYNC_LOOKBACK_DAYS * DAY_MS);
     const touched = new Set<number>();
     const latestText = new Map<number, LatestText>();
     let revisions = 0;
     const inTeam = await this.teamAreaFilter(projectId);
+
+    const store = async (raw: ReportingRevision[]) => {
+      const normalized = raw
+        .map(normalizeRevision)
+        .filter((r): r is NormalizedRevision => r !== null)
+        .filter((r) => !inTeam || inTeam(r.snapshot.areaPath));
+      if (normalized.length === 0) return;
+      await this.upsertPeople(
+        normalized
+          .flatMap((r) => [r.changedBy, r.snapshot.assignedTo])
+          .filter((p): p is PersonSnapshot => !!p),
+      );
+      // Revisions are immutable in ADO, so existing (id, rev) rows are left untouched.
+      await this.ensureWorkItemStubs(projectId, normalized);
+      const res = await this.prisma.workItemRevision.createMany({
+        data: normalized.map((r) => ({
+          workItemId: r.id,
+          rev: r.rev,
+          projectId,
+          changedDate: r.changedDate,
+          changedById: r.changedBy?.id ?? null,
+          fields: r.snapshot as unknown as Prisma.InputJsonValue,
+        })),
+        skipDuplicates: true,
+      });
+      revisions += res.count;
+      if (full) {
+        // Revisions don't change in ADO, but a full resync refreshes our stored copy so newly
+        // read fields (e.g. the board column) reach rows that were synced before.
+        await this.prisma.$transaction(
+          normalized.map((r) =>
+            this.prisma.workItemRevision.update({
+              where: { workItemId_rev: { workItemId: r.id, rev: r.rev } },
+              data: { fields: r.snapshot as unknown as Prisma.InputJsonValue },
+            }),
+          ),
+        );
+      }
+      for (const r of normalized) {
+        touched.add(r.id);
+        const prev = latestText.get(r.id);
+        if (!prev || r.rev > prev.rev) {
+          latestText.set(r.id, {
+            rev: r.rev,
+            description: r.descriptionText,
+            acceptanceCriteria: r.acceptanceCriteriaText,
+          });
+        }
+      }
+    };
+
+    if (!token && inTeam) {
+      // The project-wide feed would page through every team's history just to keep this one's.
+      // Seed from the team's own items instead, then follow the feed from this point on.
+      const seededAt = new Date();
+      const areas = await this.prisma.teamArea.findMany({
+        where: {
+          team: { projectId, name: { equals: this.config.ADO_TEAM, mode: 'insensitive' } },
+        },
+      });
+      const ids = await this.ado.queryIdsInAreas(projectId, areas, startDateTime);
+      this.logger.log({ projectId, items: ids.length }, 'Seeding team work items');
+      for (const id of ids) await store(await this.ado.listWorkItemRevisions(projectId, id));
+      startDateTime = seededAt;
+    }
 
     for (;;) {
       const batch = await this.ado.reportingRevisions(projectId, {
         continuationToken: token,
         startDateTime,
       });
-      const normalized = batch.values
-        .map(normalizeRevision)
-        .filter((r): r is NormalizedRevision => r !== null)
-        .filter((r) => !inTeam || inTeam(r.snapshot.areaPath));
-
-      if (normalized.length > 0) {
-        await this.upsertPeople(
-          normalized
-            .flatMap((r) => [r.changedBy, r.snapshot.assignedTo])
-            .filter((p): p is PersonSnapshot => !!p),
-        );
-        // Revisions are immutable in ADO, so existing (id, rev) rows are left untouched.
-        await this.ensureWorkItemStubs(projectId, normalized);
-        const res = await this.prisma.workItemRevision.createMany({
-          data: normalized.map((r) => ({
-            workItemId: r.id,
-            rev: r.rev,
-            projectId,
-            changedDate: r.changedDate,
-            changedById: r.changedBy?.id ?? null,
-            fields: r.snapshot as unknown as Prisma.InputJsonValue,
-          })),
-          skipDuplicates: true,
-        });
-        revisions += res.count;
-        if (full) {
-          // Revisions don't change in ADO, but a full resync refreshes our stored copy so newly
-          // read fields (e.g. the board column) reach rows that were synced before.
-          await this.prisma.$transaction(
-            normalized.map((r) =>
-              this.prisma.workItemRevision.update({
-                where: { workItemId_rev: { workItemId: r.id, rev: r.rev } },
-                data: { fields: r.snapshot as unknown as Prisma.InputJsonValue },
-              }),
-            ),
-          );
-        }
-        for (const r of normalized) {
-          touched.add(r.id);
-          const prev = latestText.get(r.id);
-          if (!prev || r.rev > prev.rev) {
-            latestText.set(r.id, {
-              rev: r.rev,
-              description: r.descriptionText,
-              acceptanceCriteria: r.acceptanceCriteriaText,
-            });
-          }
-        }
-      }
+      await store(batch.values);
 
       token = batch.continuationToken ?? token;
       // Persist progress after each batch so an interrupted sync resumes instead of restarting.
@@ -405,23 +432,76 @@ export class SyncService {
       for (const id of outside) touched.delete(id);
     }
     // Adding a comment creates a revision, so the touched items are exactly the ones to refresh.
+    const parentSprintChanged: number[] = [];
     for (const id of touched) {
       await this.syncComments(projectId, id);
-      await this.syncAttachments(projectId, id);
+      if (await this.syncRelations(projectId, id)) parentSprintChanged.push(id);
+    }
+    if (parentSprintChanged.length) {
+      await this.syncParentSprints(projectId);
+      // Their sprint history depends on the parent's sprint, which is only known now.
+      await this.processor.processItems(projectId, parentSprintChanged);
     }
     return { items: touched.size, revisions };
   }
 
-  /** Replaces an item's stored attachment links with the current Azure DevOps ones. */
-  private async syncAttachments(projectId: string, workItemId: number) {
-    const files = await this.ado.listAttachments(projectId, workItemId);
+  /**
+   * Replaces an item's stored attachments and sets its parent and the parent's Iteration, all
+   * from its current links. The parent's Iteration stands in when the item has no sprint.
+   */
+  private async syncRelations(projectId: string, workItemId: number): Promise<boolean> {
+    const { attachments: files, parentId } = await this.ado.listRelations(projectId, workItemId);
+    const parentIterationPath = parentId
+      ? await this.ado.getIterationPath(projectId, parentId)
+      : null;
+    const before = await this.prisma.workItem.findUnique({
+      where: { id: workItemId },
+      select: { parentIterationPath: true },
+    });
     await this.prisma.$transaction([
+      this.prisma.workItem.updateMany({
+        where: { id: workItemId },
+        data: { parentId, parentIterationPath },
+      }),
       this.prisma.workItemAttachment.deleteMany({ where: { workItemId } }),
       this.prisma.workItemAttachment.createMany({
         data: files.map((f) => ({ workItemId, ...f })),
         skipDuplicates: true,
       }),
     ]);
+    return (before?.parentIterationPath ?? null) !== parentIterationPath;
+  }
+
+  /**
+   * Adds dates for the sprints parents sit in. Only the team's own sprints come with the team
+   * settings, so a parent's sprint (e.g. one planned by another team) would otherwise have no
+   * start or end date.
+   */
+  private async syncParentSprints(projectId: string) {
+    const [wanted, known] = await Promise.all([
+      this.prisma.workItem.findMany({
+        where: { projectId, parentIterationPath: { contains: SPRINT_SEPARATOR } },
+        select: { parentIterationPath: true },
+        distinct: ['parentIterationPath'],
+      }),
+      this.prisma.iteration.findMany({ where: { projectId }, select: { path: true } }),
+    ]);
+    const have = new Set(known.map((k) => k.path));
+    const missing = new Set(wanted.map((w) => w.parentIterationPath!).filter((p) => !have.has(p)));
+    if (!missing.size) return;
+    for (const it of await this.ado.listProjectIterations(projectId)) {
+      if (!missing.has(it.path)) continue;
+      const dates = {
+        name: it.name,
+        startDate: parseDate(it.startDate ?? undefined),
+        finishDate: parseDate(it.finishDate ?? undefined),
+      };
+      await this.prisma.iteration.upsert({
+        where: { projectId_path: { projectId, path: it.path } },
+        create: { id: it.id, projectId, path: it.path, ...dates },
+        update: dates,
+      });
+    }
   }
 
   /** Replaces an item's stored comments with the current Azure DevOps discussion. */

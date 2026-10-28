@@ -40,11 +40,15 @@ export function formatOverUnder(ratio: number | null | undefined): string {
   if (pct === 0) return 'On Target';
   return pct > 0 ? `+${pct}% Over` : `${pct}% Under`;
 }
-type Period = 'week' | 'month' | 'year';
+/** When the team started tracking its work here; the "Since May 2026" period starts on this day. */
+const TRACKING_START = new Date(2026, 4, 1);
+
+type Period = 'week' | 'month' | 'year' | 'tracking';
 const PERIODS: { value: Period; label: string }[] = [
   { value: 'week', label: 'This week' },
   { value: 'month', label: 'This month' },
   { value: 'year', label: 'This year' },
+  { value: 'tracking', label: 'Since May 2026' },
 ];
 
 function usePeriod(): [Period, (p: Period) => void] {
@@ -64,6 +68,7 @@ function usePeriod(): [Period, (p: Period) => void] {
 function periodStart(period: Period, day: number): Date {
   if (period === 'week') return startOfWeek(day, { weekStartsOn: 1 });
   if (period === 'month') return startOfMonth(day);
+  if (period === 'tracking') return TRACKING_START;
   return startOfYear(day);
 }
 

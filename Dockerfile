@@ -154,6 +154,7 @@ COPY --from=build /app/apps/web/dist ./apps/web/dist
 
 ENV NODE_ENV=production \
     PORT=3000 \
+    HOST=0.0.0.0 \
     STATIC_DIR=/app/apps/web/dist \
     TMPDIR=/tmp
 

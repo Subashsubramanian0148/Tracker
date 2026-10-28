@@ -18,6 +18,7 @@ import { sprintsSpanned, type SprintWindow } from '../metrics/engine/delays';
 import { round } from '../metrics/engine/stats';
 import { PrismaService } from '../prisma/prisma.service';
 import { toDelayReason, toSummary, type WorkItemRow } from './mappers';
+import { SPRINT_SEPARATOR } from './mappers';
 
 const SORT_FIELD = {
   changedDate: 'changedDate',
@@ -61,7 +62,18 @@ export class WorkItemsService {
           ? { stateCategory: q.stateCategory }
           : { stateCategory: { not: 'Removed' } },
         q.type ? { type: q.type } : {},
-        q.iterationPath ? { iterationPath: q.iterationPath } : {},
+        q.iterationPath
+          ? {
+              OR: [
+                { iterationPath: q.iterationPath },
+                // Children with no sprint of their own count in their parent's sprint.
+                {
+                  parentIterationPath: q.iterationPath,
+                  iterationPath: { not: { contains: SPRINT_SEPARATOR } },
+                },
+              ],
+            }
+          : {},
         q.delayed === undefined ? {} : { isDelayed: q.delayed },
         q.search
           ? {
@@ -107,7 +119,7 @@ export class WorkItemsService {
       toSummary(
         r,
         this.scope.personRef(r.assignedToId ? people.get(r.assignedToId) : null, vis),
-        r.iterationPath ? finishByPath.get(r.iterationPath) : undefined,
+        finishByPath,
         r._count.delayReasons > 0,
       ),
     );

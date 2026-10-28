@@ -18,11 +18,11 @@ export function DiamondMark({ filled, className }: { filled?: boolean; className
 export function LogoMark({ className }: { className?: string }) {
   return (
     <svg aria-hidden viewBox="0 0 32 32" className={clsx('size-8 shrink-0', className)}>
-      <rect width="32" height="32" rx="9" fill="#FBE3E4" />
+      <rect width="32" height="32" rx="9" fill="#dbeafe" />
       <g
         transform="translate(7 7) scale(0.75)"
         fill="none"
-        stroke="#D62B31"
+        stroke="#3b82f6"
         strokeWidth="2.4"
         strokeLinecap="round"
         strokeLinejoin="round"

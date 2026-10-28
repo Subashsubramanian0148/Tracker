@@ -2,55 +2,55 @@
 @import 'tw-animate-css';
 
 /*
- * Theme: DesignFlow coral, built on the tweakcn base (cmie97f2b000704l27r9g1p11). Raw shadcn-style variables live on :root / .dark;
+ * Theme: DesignFlow blue, built on the tweakcn base (cmie97f2b000704l27r9g1p11). Raw shadcn-style variables live on :root / .dark;
  * the app's own token names below point at them, so every existing class follows the theme.
  */
 :root {
-  --background: #faf7f5;
+  --background: #f7f9fc;
   --foreground: #171717;
   --card: #ffffff;
   --card-foreground: #171717;
   --popover: #ffffff;
   --popover-foreground: #171717;
-  --primary: #BA141A;
-  --primary-foreground: #fffaf7;
-  --secondary: #f1ece9;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #eef2f7;
   --secondary-foreground: #222222;
-  --muted: #f7f3f1;
-  --muted-foreground: #57534e;
-  --accent: #FBE3E4;
-  --accent-foreground: #5E0A0D;
+  --muted: #f3f6fa;
+  --muted-foreground: #525a66;
+  --accent: #dbeafe;
+  --accent-foreground: #1e3a8a;
   --destructive: #b42318;
   --destructive-foreground: #fafafa;
-  --border: #ebe5e1;
-  --input: #f1ece9;
-  --ring: #D62B31;
-  --chart-1: #FBE3E4;
-  --chart-2: #F2A1A4;
-  --chart-3: #D62B31;
-  --chart-4: #BA141A;
-  --chart-5: #7a2610;
-  --sidebar: #fbf8f6;
+  --border: #e3e8ef;
+  --input: #eef2f7;
+  --ring: #3b82f6;
+  --chart-1: #dbeafe;
+  --chart-2: #93c5fd;
+  --chart-3: #3b82f6;
+  --chart-4: #2563eb;
+  --chart-5: #1e3a8a;
+  --sidebar: #f8fafc;
   --sidebar-foreground: #171717;
-  --sidebar-primary: #BA141A;
-  --sidebar-primary-foreground: #fffaf7;
-  --sidebar-accent: #FBE3E4;
-  --sidebar-accent-foreground: #5E0A0D;
-  --sidebar-border: #ebe5e1;
-  --sidebar-ring: #D62B31;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dbeafe;
+  --sidebar-accent-foreground: #1e3a8a;
+  --sidebar-border: #e3e8ef;
+  --sidebar-ring: #3b82f6;
   --radius: 0.5rem;
-  --shadow-2xs: 0.25px 1px 3px 0px hsl(15 60% 20% / 0.07);
-  --shadow-xs: 0.25px 1px 3px 0px hsl(15 60% 20% / 0.07);
+  --shadow-2xs: 0.25px 1px 3px 0px hsl(220 60% 20% / 0.07);
+  --shadow-xs: 0.25px 1px 3px 0px hsl(220 60% 20% / 0.07);
   --shadow-sm:
-    0.25px 1px 3px 0px hsl(15 60% 20% / 0.15), 0.25px 1px 2px -1px hsl(15 60% 20% / 0.15);
-  --shadow: 0.25px 1px 3px 0px hsl(15 60% 20% / 0.15), 0.25px 1px 2px -1px hsl(15 60% 20% / 0.15);
+    0.25px 1px 3px 0px hsl(220 60% 20% / 0.15), 0.25px 1px 2px -1px hsl(220 60% 20% / 0.15);
+  --shadow: 0.25px 1px 3px 0px hsl(220 60% 20% / 0.15), 0.25px 1px 2px -1px hsl(220 60% 20% / 0.15);
   --shadow-md:
-    0.25px 1px 3px 0px hsl(15 60% 20% / 0.15), 0.25px 2px 4px -1px hsl(15 60% 20% / 0.15);
+    0.25px 1px 3px 0px hsl(220 60% 20% / 0.15), 0.25px 2px 4px -1px hsl(220 60% 20% / 0.15);
   --shadow-lg:
-    0.25px 1px 3px 0px hsl(15 60% 20% / 0.15), 0.25px 4px 6px -1px hsl(15 60% 20% / 0.15);
+    0.25px 1px 3px 0px hsl(220 60% 20% / 0.15), 0.25px 4px 6px -1px hsl(220 60% 20% / 0.15);
   --shadow-xl:
-    0.25px 1px 3px 0px hsl(15 60% 20% / 0.15), 0.25px 8px 10px -1px hsl(15 60% 20% / 0.15);
-  --shadow-2xl: 0.25px 1px 3px 0px hsl(15 60% 20% / 0.38);
+    0.25px 1px 3px 0px hsl(220 60% 20% / 0.15), 0.25px 8px 10px -1px hsl(220 60% 20% / 0.15);
+  --shadow-2xl: 0.25px 1px 3px 0px hsl(220 60% 20% / 0.38);
 }
 
 .dark {
@@ -64,19 +64,19 @@
   --secondary-foreground: #ebebeb;
   --muted: #1d1d1d;
   --muted-foreground: #a4a4a4;
-  --accent: #3A1A1C;
-  --accent-foreground: #FBE3E4;
+  --accent: #172554;
+  --accent-foreground: #dbeafe;
   --destructive: #ff5b5b;
   --border: #242424;
   --input: #333333;
-  --chart-1: #7a2610;
-  --chart-2: #BA141A;
-  --chart-4: #F2A1A4;
-  --chart-5: #FBE3E4;
+  --chart-1: #1e3a8a;
+  --chart-2: #2563eb;
+  --chart-4: #93c5fd;
+  --chart-5: #dbeafe;
   --sidebar: #000000;
   --sidebar-foreground: #ededed;
-  --sidebar-accent: #3A1A1C;
-  --sidebar-accent-foreground: #FBE3E4;
+  --sidebar-accent: #172554;
+  --sidebar-accent-foreground: #dbeafe;
   --sidebar-border: #242424;
 }
 
@@ -130,7 +130,7 @@
 
   /* App tokens, mapped onto the theme. */
   --font-display: 'Geist Variable', Geist, ui-sans-serif, system-ui, sans-serif;
-  --font-number: 'DM Serif Display', Georgia, serif;
+  --font-number: 'Geist Variable', Geist, ui-sans-serif, system-ui, sans-serif;
   --font-sans: 'Geist Variable', Geist, ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, monospace;
 
@@ -145,7 +145,7 @@
   --color-ink-soft: var(--secondary-foreground);
   --color-faint: #8a8a8a;
   --color-line: var(--border);
-  --color-line-strong: #ddd5d0;
+  --color-line-strong: #d5dce6;
 
   --color-brand-bright: var(--chart-3);
   --color-brand-soft: var(--accent);
@@ -177,14 +177,54 @@
   --color-col-removed: #a3a3a3;
 
   /* Chart series (validated categorical palette, fixed order). */
-  --color-series-1: #BA141A;
-  --color-series-2: #2a78d6;
+  --color-series-1: #2563eb;
+  --color-series-2: #f97316;
   --color-series-3: #1baf7a;
 
-  --shadow-cta: 0 6px 16px -6px rgb(92 29 11 / 0.35);
+  --shadow-cta: 0 6px 16px -6px rgb(29 52 120 / 0.35);
 
   --animate-fade-in: fade-in 160ms ease-out;
   --animate-toast-in: toast-in 200ms ease-out;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-float-slow: float 9s ease-in-out infinite;
+  --animate-orbit: orbit 24s linear infinite;
+  --animate-pulse-ring: pulse-ring 3.2s ease-out infinite;
+  --animate-slide-up: slide-up 600ms ease-out both;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-14px);
+    }
+  }
+  @keyframes orbit {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes pulse-ring {
+    from {
+      opacity: 0.55;
+      transform: scale(0.85);
+    }
+    to {
+      opacity: 0;
+      transform: scale(1.45);
+    }
+  }
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 
   @keyframes fade-in {
     from {
@@ -236,16 +276,16 @@
 
 /* Gradient-border pill (e.g. "Sync now", due pills): border painted by a padded wrapper. */
 @utility gradient-ring {
-  background-image: linear-gradient(90deg, #F2A1A4, #D62B31 50%, #BA141A);
+  background-image: linear-gradient(90deg, #93c5fd, #3b82f6 50%, #2563eb);
 }
 @utility gradient-ring-due {
-  background-image: linear-gradient(90deg, #F2A1A4, #D62B31);
+  background-image: linear-gradient(90deg, #93c5fd, #3b82f6);
 }
 @utility gradient-ring-user {
-  background-image: linear-gradient(90deg, #F2A1A4, #D62B31);
+  background-image: linear-gradient(90deg, #93c5fd, #3b82f6);
 }
 @utility gradient-wash {
-  background-image: linear-gradient(135deg, #FBE3E4 0%, #F2A1A4 60%, #D62B31 100%);
+  background-image: linear-gradient(135deg, #dbeafe 0%, #93c5fd 60%, #3b82f6 100%);
 }
 @utility dark-sheen {
   background-image: linear-gradient(180deg, #2a2a2a 0%, #111111 55%, #050505 100%);
@@ -264,8 +304,39 @@
   }
 }
 
-/* Unlayered so it beats font-semibold: DM Serif ships one weight, so skip the smeared fake bold. */
+/* Unlayered so it beats font-semibold: big numbers are always bold. */
 .font-number {
-  font-weight: 400;
-  letter-spacing: 0;
+  font-weight: 700;
+}
+
+/* Outside @theme: used from inline styles, so Tailwind would otherwise drop it. */
+@keyframes streak {
+  from {
+    opacity: 0;
+    transform: translateY(-220px);
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(110vh);
+  }
+}
+
+/* Alarm-bell shake for warning icons. */
+@keyframes ring {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  20%,
+  60% {
+    transform: rotate(-14deg);
+  }
+  40%,
+  80% {
+    transform: rotate(14deg);
+  }
 }

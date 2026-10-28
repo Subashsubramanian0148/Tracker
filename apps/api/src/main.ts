@@ -20,12 +20,18 @@ async function bootstrap() {
   configureHttp(app, config);
   app.enableShutdownHooks();
 
-  await app.listen(config.PORT, '0.0.0.0');
-  app.get(Logger).log(`API listening on port ${config.PORT} (${config.NODE_ENV}, auth=${config.AUTH_MODE})`);
+  await app.listen(config.PORT, config.HOST);
+  app
+    .get(Logger)
+    .log(
+      `API listening on ${config.HOST}:${config.PORT} (${config.NODE_ENV}, auth=${config.AUTH_MODE})`,
+    );
 }
 
 bootstrap().catch((err: unknown) => {
   // Logger may not exist yet; write a single structured line and exit non-zero.
-  process.stderr.write(`${JSON.stringify({ level: 'fatal', msg: err instanceof Error ? err.message : String(err) })}\n`);
+  process.stderr.write(
+    `${JSON.stringify({ level: 'fatal', msg: err instanceof Error ? err.message : String(err) })}\n`,
+  );
   process.exit(1);
 });

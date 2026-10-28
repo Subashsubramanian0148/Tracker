@@ -65,6 +65,12 @@ export const reportingRevisionsResponse = z.object({
   continuationToken: z.string().nullish(),
   isLastBatch: z.boolean().default(true),
 });
+export const workItemRevisionsResponse = z.object({
+  value: reportingRevisionsResponse.shape.values,
+});
+export const wiqlResponse = z.object({
+  workItems: z.array(z.object({ id: z.number().int() })),
+});
 export type ReportingRevision = z.infer<typeof reportingRevisionsResponse>['values'][number];
 
 export const commentsResponse = z.object({
@@ -91,6 +97,30 @@ export const boardColumnsResponse = list(
     stateMappings: z.record(z.string(), z.string()).default({}),
   }),
 );
+
+export interface IterationNode {
+  identifier: string;
+  name: string;
+  path: string;
+  attributes?: { startDate?: string | null; finishDate?: string | null } | null;
+  children?: IterationNode[] | null;
+}
+export const iterationNodeResponse: z.ZodType<IterationNode> = z.lazy(() =>
+  z.object({
+    identifier: z.guid(),
+    name: z.string(),
+    path: z.string(),
+    attributes: z
+      .object({ startDate: z.string().nullish(), finishDate: z.string().nullish() })
+      .partial()
+      .nullish(),
+    children: z.array(iterationNodeResponse).nullish(),
+  }),
+);
+
+export const workItemIterationResponse = z.object({
+  fields: z.object({ 'System.IterationPath': z.string().optional() }).partial(),
+});
 
 export const workItemRelationsResponse = z.object({
   relations: z

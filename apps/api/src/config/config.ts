@@ -14,10 +14,14 @@ const csv = z.string().transform((s) =>
     .filter(Boolean),
 );
 
+export const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+    /** Address to listen on. This machine only by default; the container image sets 0.0.0.0. */
+    HOST: z.string().min(1).default('127.0.0.1'),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
     PUBLIC_BASE_URL: z.url(),
     /** Extra origins allowed to send mutating requests (local Vite dev server). */
@@ -37,6 +41,11 @@ const envSchema = z
       .default([]),
     /** Emails allowed into Admin (sync, categories, audit log). Everyone else: their own projects. */
     ADMIN_EMAILS: csv.transform((d) => d.map((x) => x.toLowerCase())).default([]),
+    /**
+     * Names shown in the Teammates panel (matched to the start of each person's name). ADO team
+     * membership often lists more or fewer people than actually do the work. Empty = everyone.
+     */
+    TEAMMATES: csv.default([]),
     AUTH_MODE: z.enum(['entra', 'dev']).default('entra'),
     ENTRA_TENANT_ID: z.guid().optional(),
     ENTRA_CLIENT_ID: z.guid().optional(),
@@ -82,11 +91,18 @@ const envSchema = z
     ) {
       issue('AUTH_MODE', 'dev auth is only allowed when PUBLIC_BASE_URL is http://localhost');
     }
+    if (env.AUTH_MODE === 'dev' && !LOOPBACK_HOSTS.has(env.HOST)) {
+      issue('HOST', 'dev auth is only allowed when listening on 127.0.0.1, ::1 or localhost');
+    }
+    if (isProd && env.SESSION_SECRET.length < 64) {
+      issue('SESSION_SECRET', 'must be at least 64 random characters in production');
+    }
     if (isProd && env.ADO_AUTH === 'pat')
       issue('ADO_AUTH', 'PAT auth is not allowed in production');
-    // The server forces TLS too (require_secure_transport); refuse a client that would not use it.
-    if (isProd && !/[?&]sslmode=(require|verify-ca|verify-full)\b/.test(env.DATABASE_URL)) {
-      issue('DATABASE_URL', 'must set sslmode=require (or verify-full) in production');
+    // Encrypted and verified: the certificate chain and host name are checked, so the database
+    // connection can't be intercepted (plain sslmode=require encrypts but trusts any certificate).
+    if (isProd && !/[?&]sslmode=verify-full\b/.test(env.DATABASE_URL)) {
+      issue('DATABASE_URL', 'must set sslmode=verify-full in production');
     }
     if (isProd && !env.PUBLIC_BASE_URL.startsWith('https://')) {
       issue('PUBLIC_BASE_URL', 'must be https in production');
