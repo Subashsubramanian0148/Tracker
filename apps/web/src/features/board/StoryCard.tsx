@@ -114,6 +114,13 @@ export function StoryCard({ item, projectId, now }: StoryCardProps) {
           >
             {sprint}
           </span>
+        ) : item.internalTask ? (
+          <span
+            className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground"
+            title="No sprint on this story or its parent, so it is never counted as delayed"
+          >
+            Internal task
+          </span>
         ) : null}
         {isReopened(item) ? (
           <span className="inline-flex items-center gap-1 rounded-md bg-danger/10 px-2 py-0.5 text-[11px] font-semibold text-danger">

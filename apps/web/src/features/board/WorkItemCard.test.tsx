@@ -16,6 +16,7 @@ function item(overrides: Partial<WorkItemSummary> = {}): WorkItemSummary {
     assignedTo: { id: 'u1', displayName: 'Priya Raman' },
     iterationPath: 'Scaler\\Sprint 12',
     iterationFromParent: false,
+    internalTask: false,
     areaPath: null,
     effort: 5,
     tags: [],

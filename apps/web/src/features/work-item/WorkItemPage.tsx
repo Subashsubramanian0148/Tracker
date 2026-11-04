@@ -48,6 +48,12 @@ function safeExternalUrl(url: string): string | null {
   }
 }
 
+/** Calendar days from when work started to when it finished, or to today if still open. */
+function totalDays(started: string, finished: string | null): number {
+  const end = finished ? Date.parse(finished) : Date.now();
+  return Math.max(1, Math.ceil((end - Date.parse(started)) / 86_400_000));
+}
+
 export function WorkItemPage() {
   const { project } = useProject();
   const params = useParams();
@@ -347,7 +353,18 @@ function Detail({ item, projectId }: { item: WorkItemDetail; projectId: string }
           <Stat label="Time spent working">{plainDays(item.cycleTimeDays)}</Stat>
           <Stat label="From request to done">{plainDays(item.leadTimeDays)}</Stat>
           <Stat label="Sprint">
-            {sprint ?? '—'}
+            {item.internalTask ? (
+              <>
+                Internal task
+                {item.activatedDate && (
+                  <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                    {totalDays(item.activatedDate, item.completedDate)} days in total
+                  </span>
+                )}
+              </>
+            ) : (
+              (sprint ?? '—')
+            )}
             {sprint && item.iterationFromParent && (
               <span className="ml-1.5 text-xs font-normal text-muted-foreground">from parent</span>
             )}
@@ -657,11 +674,6 @@ function buildDataIssues(item: WorkItemDetail, figma: string | null) {
         : 'Set the Iteration field in Azure DevOps to the sprint it is really in.',
     });
   }
-  if (!item.iterationPath?.includes('\\'))
-    issues.push({
-      text: 'No sprint is set on this story or its parent.',
-      fix: 'Set the Iteration in Azure DevOps on this story or its parent.',
-    });
   if (!item.assignedTo)
     issues.push({
       text: 'No one is assigned.',

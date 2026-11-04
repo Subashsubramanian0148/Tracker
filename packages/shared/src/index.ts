@@ -198,6 +198,8 @@ export interface WorkItemSummary {
   iterationPath: string | null;
   /** True when the item has no sprint of its own and iterationPath is its parent's sprint. */
   iterationFromParent: boolean;
+  /** No sprint on the story or its parent: an internal task, never counted as delayed. */
+  internalTask: boolean;
   areaPath: string | null;
   effort: number | null;
   tags: string[];

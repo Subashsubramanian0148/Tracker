@@ -8,7 +8,7 @@ import { detectDelays, type SprintWindow } from './engine/delays';
 import { analyzeHistory, type CategoryResolver } from './engine/history';
 import { DAY_MS, percentile } from './engine/stats';
 import { buildCategoryResolver } from './state-categories';
-import { effectiveIteration } from '../work-items/mappers';
+import { effectiveIteration, isInternalTask } from '../work-items/mappers';
 
 export interface LatestText {
   rev: number;
@@ -240,22 +240,27 @@ export class WorkItemProcessor {
         iterationPath: effectiveIteration(raw).path,
         comments: raw.comments.map((c) => (ignored.has(c.commentId) ? { ...c, signals: [] } : c)),
       };
-      const commentHours = Math.round(
-        commentDelay(
-          item.comments,
-          { stateCategory: item.stateCategory as never, completedDate: item.completedDate },
-          now,
-        ).hours,
-      );
-      const flags = detectDelays(
-        { ...item, stateCategory: item.stateCategory as never },
-        {
-          now,
-          p85CycleHoursByType,
-          sprintsByPath,
-          blockedThresholdHours: this.config.DELAY_BLOCKED_HOURS,
-        },
-      );
+      const internal = isInternalTask(item.iterationPath);
+      const commentHours = internal
+        ? 0
+        : Math.round(
+            commentDelay(
+              item.comments,
+              { stateCategory: item.stateCategory as never, completedDate: item.completedDate },
+              now,
+            ).hours,
+          );
+      const flags = internal
+        ? []
+        : detectDelays(
+            { ...item, stateCategory: item.stateCategory as never },
+            {
+              now,
+              p85CycleHoursByType,
+              sprintsByPath,
+              blockedThresholdHours: this.config.DELAY_BLOCKED_HOURS,
+            },
+          );
       const same =
         flags.length === item.delayFlags.length && flags.every((f) => item.delayFlags.includes(f));
       const delayed = flags.length > 0 && !item.dismissal;

@@ -54,6 +54,14 @@ export function effectiveIteration(w: Pick<WorkItemRow, 'iterationPath' | 'paren
   return { path: w.iterationPath, fromParent: false };
 }
 
+/**
+ * With no sprint on the story or its parent, it is an internal task: there is no deadline to be
+ * late against, so it is never flagged as delayed. Its total days still count.
+ */
+export function isInternalTask(sprintPath: string | null): boolean {
+  return !sprintPath?.includes('\\');
+}
+
 export function toSummary(
   w: WorkItemRow,
   assignedTo: PersonRef | null,
@@ -61,7 +69,9 @@ export function toSummary(
   hasDelayReason: boolean,
 ): WorkItemSummary {
   const sprint = effectiveIteration(w);
-  const dueDate = sprints.find((s) => s.path === sprint.path)?.finishDate;
+  const dueDate = isInternalTask(sprint.path)
+    ? undefined
+    : sprints.find((s) => s.path === sprint.path)?.finishDate;
   return {
     id: w.id,
     projectId: w.projectId,
@@ -73,6 +83,7 @@ export function toSummary(
     assignedTo,
     iterationPath: sprint.path,
     iterationFromParent: sprint.fromParent,
+    internalTask: isInternalTask(sprint.path),
     areaPath: w.areaPath,
     effort: w.effort,
     tags: w.tags,
