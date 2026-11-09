@@ -62,6 +62,9 @@ const envSchema = z
     ADO_PROJECTS: csv.default([]),
     /** Only sync this team's board (its columns and area paths), e.g. "UX". Empty = whole project. */
     ADO_TEAM: z.string().trim().min(1).optional(),
+    /** Groq key for AI story summaries. Without it the Summarise button is hidden. */
+    GROQ_API_KEY: z.string().trim().min(1).optional(),
+    GROQ_MODEL: z.string().trim().min(1).default('openai/gpt-oss-120b'),
     /** When true, the scheduler and queue consumer are disabled (demo data / tests). */
     SYNC_DISABLED: bool.default(false),
     SYNC_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(86_400).default(10),

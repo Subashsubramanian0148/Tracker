@@ -11,6 +11,7 @@ import {
 import type { Request } from 'express';
 import { isManager, ProjectAccessGuard } from '../common/guards';
 import { ZodPipe } from '../common/zod-validation.pipe';
+import { BACKLOG_TYPES } from '../metrics/engine/delays';
 import { MetricsService } from '../metrics/metrics.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -30,7 +31,13 @@ export class ProjectsController {
     const [counts, delays] = await Promise.all([
       this.prisma.workItem.groupBy({
         by: ['projectId'],
-        where: { projectId: { in: ids }, isDeleted: false },
+        // Same items as the board: backlog types, not removed.
+        where: {
+          projectId: { in: ids },
+          isDeleted: false,
+          type: { in: [...BACKLOG_TYPES] },
+          stateCategory: { not: 'Removed' },
+        },
         _count: { _all: true },
       }),
       this.prisma.workItem.groupBy({

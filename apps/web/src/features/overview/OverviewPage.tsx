@@ -312,7 +312,6 @@ function StoriesSummaryCard({
   const stats: { label: string; value: string; kind: DetailKind; group?: string }[] = data
     ? [
         { label: 'Total stories', value: formatNumber(total), kind: 'stages' },
-        { label: 'Delivered', value: formatNumber(data.delivered), kind: 'stages', group: 'done' },
         {
           label: 'On time',
           value: total ? formatPercent(data.onTime / total) : '—',
@@ -483,7 +482,6 @@ function Body({
           ['Moved to next sprint', sc.sprintMoves],
           ['Owner changed', sc.reassignments],
           ['Added mid-sprint', sc.addedMidSprint],
-          ['Stories affected', sc.itemsAffected],
         ].map(([label, value]) => ({
           label: String(label),
           value: formatNumber(Number(value)),

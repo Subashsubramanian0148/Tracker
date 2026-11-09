@@ -1,6 +1,7 @@
 import type { EstimateSummary, WorkItemDetail } from '@ado-metrics/shared';
 import clsx from 'clsx';
 import {
+  ChevronRight,
   CircleCheck,
   Paperclip,
   MessageSquare,
@@ -17,10 +18,15 @@ import {
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { isApiError } from '../../api/client';
-import { useDismissDelay, useIgnoreComment, useWorkItem } from '../../api/workItems';
+import {
+  useAiSummary,
+  useDismissDelay,
+  useIgnoreComment,
+  useSummaryEnabled,
+  useWorkItem,
+} from '../../api/workItems';
 import { NotFoundPage } from '../../app/ErrorPages';
 import { useProject } from '../../app/projectContext';
-import { Avatar } from '../../components/ui/Avatar';
 import { Card as BaseCard } from '../../components/ui/Card';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -36,7 +42,8 @@ import { STATE_CATEGORY_BG, STATE_CATEGORY_PILL } from '../../lib/labels';
 import { AzureComments } from './AzureComments';
 import { DelayReasonForm } from './DelayReasonForm';
 import { DelayReasonHistory } from './DelayReasonHistory';
-import { StateTimeline } from './StateTimeline';
+import { AiSummary, SummariseButton } from './AiSummary';
+import { StoryHero } from './StoryHero';
 
 /** Only allow https links out to Azure DevOps (defends against javascript: URLs). */
 function safeExternalUrl(url: string): string | null {
@@ -46,12 +53,6 @@ function safeExternalUrl(url: string): string | null {
   } catch {
     return null;
   }
-}
-
-/** Calendar days from when work started to when it finished, or to today if still open. */
-function totalDays(started: string, finished: string | null): number {
-  const end = finished ? Date.parse(finished) : Date.now();
-  return Math.max(1, Math.ceil((end - Date.parse(started)) / 86_400_000));
 }
 
 export function WorkItemPage() {
@@ -115,6 +116,8 @@ function Detail({ item, projectId }: { item: WorkItemDetail; projectId: string }
   // A path with no sprint segment is just the project: no sprint to show.
   const sprint = item.iterationPath?.includes('\\') ? item.iterationPath.split('\\').pop() : null;
 
+  const aiEnabled = useSummaryEnabled(projectId).data?.enabled ?? false;
+  const aiSummary = useAiSummary(projectId, item.id);
   const lateReasons = buildLateReasons(item, sprint);
   const dataIssues = buildDataIssues(item, figma);
   const ignoreComment = useIgnoreComment(projectId, item.id);
@@ -159,425 +162,399 @@ function Detail({ item, projectId }: { item: WorkItemDetail; projectId: string }
         ) : null}
       </div>
 
-      {/* 1. The story: what it is, when it started, who has it. */}
-      <header className="mt-6">
-        <h2
-          id="wi-title"
-          className="text-[28px] leading-tight font-semibold tracking-tight break-words"
-        >
-          {item.title}
-        </h2>
-        <dl className="mt-4 flex flex-wrap items-center gap-x-8 gap-y-3 text-sm">
-          <div className="flex items-center gap-2">
-            <dt className="text-muted-foreground">Started</dt>
-            <dd className="font-medium tabular-nums">
-              {item.activatedDate ? formatShortDate(item.activatedDate) : 'Not started'}
-            </dd>
-          </div>
-          <div className="flex items-center gap-2">
-            <dt className="text-muted-foreground">Assigned to</dt>
-            <dd className="inline-flex items-center gap-2 font-medium">
-              <Avatar name={item.assignedTo?.displayName} seed={item.assignedTo?.id} size="xs" />
-              {item.assignedTo?.displayName ?? 'Unassigned'}
-            </dd>
-          </div>
-          <div className="flex items-center gap-2">
-            <dt className="text-muted-foreground">Status</dt>
-            <dd>
-              <span
-                className={clsx(
-                  'rounded-md px-2 py-0.5 text-[13px] font-medium',
-                  STATE_CATEGORY_PILL[item.stateCategory],
-                )}
-              >
-                {item.state}
-              </span>
-            </dd>
-          </div>
-        </dl>
-        {item.tags.length > 0 ? (
-          <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Tags">
-            {item.tags.map((t) => (
-              <li key={t} className="rounded-full bg-sidebar px-2.5 py-0.5 text-xs text-ink-soft">
-                #{t}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </header>
+      <StoryHero
+        action={aiEnabled ? <SummariseButton summary={aiSummary} /> : undefined}
+        item={item}
+        days={days}
+        sprint={item.internalTask ? 'Internal task' : (sprint ?? null)}
+        attention={[
+          ...lateReasons.map((r) => r.title),
+          ...dataIssues.map((d) => d.text.replace(/\.$/, '')),
+        ]}
+      />
 
-      {/* 2. Description. */}
-      <section aria-labelledby="wi-desc" className="mt-8">
-        <h3 id="wi-desc" className="text-base font-semibold">
-          Description
-        </h3>
-        <div className="mt-3 rounded-xl border border-line px-5 py-4 text-sm leading-relaxed text-ink-soft">
-          {item.description || item.acceptanceCriteria ? (
-            <div className="space-y-4">
-              {item.description ? (
-                <p className="break-words whitespace-pre-wrap">{item.description}</p>
-              ) : null}
-              {item.acceptanceCriteria ? (
-                <div>
-                  <h4 className="mb-1 text-[13px] font-semibold text-ink">Acceptance criteria</h4>
-                  <p className="break-words whitespace-pre-wrap">{item.acceptanceCriteria}</p>
-                </div>
+      <AiSummary summary={aiSummary} />
+
+      {dataIssues.length > 0 || lateReasons.length > 0 ? (
+        <section id="needs-attention" aria-label="Needs attention" className="mt-6 scroll-mt-4">
+          {dataIssues.length > 0 ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+              <h4 className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                <TriangleAlert aria-hidden className="size-4" />
+                Data check
+              </h4>
+              <ul className="mt-3 space-y-3 text-sm text-amber-900">
+                {dataIssues.map((d) => (
+                  <li key={d.text}>
+                    <p className="font-medium">
+                      {d.text}
+                      {d.excluded ? (
+                        <span className="font-normal text-amber-700">
+                          {' '}
+                          · left out of team averages
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="mt-0.5 text-amber-800">
+                      <span className="font-medium">How to fix:</span> {d.fix}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-amber-800">
+                Once it’s fixed in Azure DevOps, this updates at the next sync.
+              </p>
+            </div>
+          ) : null}
+
+          {lateReasons.length > 0 ? (
+            <div className="mt-4 rounded-xl border border-danger/20 bg-danger/[0.03] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold">
+                  Why it&apos;s flagged
+                  {item.dismissal ? (
+                    <span className="ml-2 font-normal text-muted-foreground">
+                      · not counted as late
+                    </span>
+                  ) : null}
+                </h4>
+                {item.dismissal ? (
+                  <button
+                    type="button"
+                    onClick={() => dismiss.mutate(null)}
+                    className="text-[13px] text-muted-foreground hover:text-ink hover:underline"
+                  >
+                    Count as late again
+                  </button>
+                ) : !dismissing ? (
+                  <button
+                    type="button"
+                    onClick={() => setDismissing(true)}
+                    className="inline-flex h-8 items-center rounded-lg border border-line px-3 text-[13px] font-medium hover:bg-sidebar"
+                  >
+                    Not really late
+                  </button>
+                ) : null}
+              </div>
+              <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {lateReasons.map((r) => (
+                  <li key={r.title} className="rounded-xl border border-line px-4 py-3">
+                    <p className="text-sm font-medium">{r.title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{r.why}</p>
+                  </li>
+                ))}
+              </ul>
+              {item.dismissal ? (
+                <p className="mt-3 text-sm text-ink-soft">
+                  {item.dismissal.by} marked this as not really late: &ldquo;{item.dismissal.reason}
+                  &rdquo;
+                </p>
+              ) : dismissing ? (
+                <form
+                  className="mt-3 flex flex-wrap items-center gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (dismissReason.trim().length < 3) return;
+                    dismiss.mutate(dismissReason.trim(), {
+                      onSuccess: () => {
+                        setDismissing(false);
+                        setDismissReason('');
+                      },
+                    });
+                  }}
+                >
+                  <label htmlFor="dismiss-reason" className="sr-only">
+                    Why it wasn&apos;t really late
+                  </label>
+                  <input
+                    id="dismiss-reason"
+                    value={dismissReason}
+                    onChange={(e) => setDismissReason(e.target.value)}
+                    maxLength={500}
+                    placeholder="Planned to run into the next sprint"
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-card px-3 text-sm"
+                  />
+                  <button
+                    type="submit"
+                    disabled={dismissReason.trim().length < 3 || dismiss.isPending}
+                    className="h-9 rounded-lg bg-ink px-3 text-[13px] font-medium text-white disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDismissing(false)}
+                    className="h-9 rounded-lg px-3 text-[13px] text-muted-foreground hover:text-ink"
+                  >
+                    Cancel
+                  </button>
+                </form>
               ) : null}
             </div>
-          ) : (
-            <p className="text-muted-foreground">No description in Azure DevOps.</p>
-          )}
-        </div>
-        {figma ? (
-          <a
-            href={figma}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 inline-flex items-center gap-3 rounded-xl border border-line py-2 pr-4 pl-2.5 text-sm hover:bg-sidebar"
-          >
-            <span className="grid size-8 place-items-center rounded-lg bg-violet-50 text-[11px] font-bold text-violet-600">
-              fig
-            </span>
-            <span className="font-medium">Final design in Figma</span>
-            <ExternalLink aria-hidden className="size-4 text-muted-foreground" />
-            <span className="sr-only">(opens in a new tab)</span>
-          </a>
-        ) : null}
-        {item.attachments.length > 0 ? (
-          <ul className="mt-3 flex flex-wrap gap-2" aria-label="Attachments">
-            {item.attachments.map((f) => (
-              <li key={f.url}>
-                <a
-                  href={f.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-sidebar"
-                >
-                  <Paperclip aria-hidden className="size-3.5 text-muted-foreground" />
-                  <span className="font-medium">{f.name}</span>
-                  {f.sizeBytes !== null ? (
-                    <span className="text-xs text-muted-foreground">{fileSize(f.sizeBytes)}</span>
-                  ) : null}
-                  <span className="sr-only">(opens in Azure DevOps)</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
-
-      {/* 3. Comments. */}
-      <section aria-labelledby="wi-comments" className="mt-8">
-        <h3 id="wi-comments" className="text-base font-semibold">
-          Comments
-          <span className="ml-2 text-sm font-normal text-muted-foreground">
-            {item.comments.length}
-          </span>
-        </h3>
-        <div className="mt-3">
-          <AzureComments
-            comments={item.comments}
-            onIgnore={(commentId, ignored) => ignoreComment.mutate({ commentId, ignored })}
-          />
-          <p className="mt-4 text-xs text-muted-foreground">
-            Only tagged comments count: start a comment with #blocked, #unblocked, #reopen or #done
-            in Azure DevOps.
-          </p>
-        </div>
-      </section>
-
-      {item.children.length > 0 ? (
-        <section aria-labelledby="wi-tasks" className="mt-8">
-          <h3 id="wi-tasks" className="text-base font-semibold">
-            Tasks
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              {doneTasks} of {item.children.length} done
-            </span>
-          </h3>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-sidebar" aria-hidden>
-            <div
-              className="h-full rounded-full bg-emerald-500"
-              style={{ width: `${(doneTasks / item.children.length) * 100}%` }}
-            />
-          </div>
-          <table className="mt-3 w-full text-sm">
-            <caption className="sr-only">Child tasks</caption>
-            <thead>
-              <tr className="text-left text-xs text-muted-foreground">
-                <th className="w-12 py-2 font-normal">#</th>
-                <th className="py-2 font-normal">Task</th>
-                <th className="hidden py-2 font-normal sm:table-cell">Owner</th>
-                <th className="py-2 font-normal">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line border-t border-line">
-              {item.children.map((c, i) => (
-                <tr key={c.id}>
-                  <td className="py-2.5 text-muted-foreground tabular-nums">{i + 1}</td>
-                  <td className="py-2.5 pr-3">
-                    <Link to={`${base}/work-items/${c.id}`} className="font-medium hover:underline">
-                      {c.title}
-                    </Link>
-                  </td>
-                  <td className="hidden py-2.5 text-ink-soft sm:table-cell">
-                    {c.assignedTo?.displayName ?? 'Unassigned'}
-                  </td>
-                  <td className="py-2.5">
-                    <span
-                      className={clsx(
-                        'rounded-md px-2 py-0.5 text-xs font-medium',
-                        STATE_CATEGORY_PILL[c.stateCategory],
-                      )}
-                    >
-                      {c.state}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          ) : null}
         </section>
       ) : null}
 
-      {/* 4. Then the metrics. */}
-      <section aria-labelledby="wi-metrics" className="mt-12 border-t border-line pt-8">
-        <h3 id="wi-metrics" className="text-base font-semibold">
-          Metrics
-        </h3>
-
-        <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label={done ? 'Took' : 'Working on it for'}>
-            {days !== null ? `${days} ${days === 1 ? 'day' : 'days'}` : '—'}
-          </Stat>
-          <Stat label="Finished on">{done ? formatShortDate(item.completedDate) : '—'}</Stat>
-          <Stat label="Time spent working">{plainDays(item.cycleTimeDays)}</Stat>
-          <Stat label="From request to done">{plainDays(item.leadTimeDays)}</Stat>
-          <Stat label="Sprint">
-            {item.internalTask ? (
-              <>
-                Internal task
-                {item.activatedDate && (
-                  <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                    {totalDays(item.activatedDate, item.completedDate)} days in total
-                  </span>
-                )}
-              </>
-            ) : (
-              (sprint ?? '—')
-            )}
-            {sprint && item.iterationFromParent && (
-              <span className="ml-1.5 text-xs font-normal text-muted-foreground">from parent</span>
-            )}
-          </Stat>
-          <Stat label="Size">{item.effort !== null ? `${item.effort} points` : '—'}</Stat>
-          <Stat label="Time stuck">
-            {item.blockedHours > 0 ? plainHours(item.blockedHours) : 'Never'}
-          </Stat>
-          <Stat label="Sent back">
-            {item.reopenCount > 0
-              ? `${item.reopenCount} ${item.reopenCount === 1 ? 'time' : 'times'}`
-              : 'Never'}
-          </Stat>
-        </dl>
-
-        {dataIssues.length > 0 ? (
-          <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
-            <h4 className="flex items-center gap-2 text-sm font-semibold text-amber-900">
-              <TriangleAlert aria-hidden className="size-4" />
-              Data check
-            </h4>
-            <ul className="mt-3 space-y-3 text-sm text-amber-900">
-              {dataIssues.map((d) => (
-                <li key={d.text}>
-                  <p className="font-medium">
-                    {d.text}
-                    {d.excluded ? (
-                      <span className="font-normal text-amber-700">
-                        {' '}
-                        · left out of team averages
+      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0">
+          {/* 3. About the story: description and comments, folded away until needed. */}
+          <details className="group rounded-xl border border-line bg-card">
+            <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 select-none [&::-webkit-details-marker]:hidden">
+              <ChevronRight
+                aria-hidden
+                className="size-4 text-muted-foreground transition-transform group-open:rotate-90"
+              />
+              <span className="text-base font-semibold">About this story</span>
+              <span className="text-sm text-muted-foreground">
+                {figma ? 'Figma · ' : ''}Description · {item.comments.length}{' '}
+                {item.comments.length === 1 ? 'comment' : 'comments'}
+              </span>
+            </summary>
+            <div className="space-y-8 border-t border-line px-5 py-5">
+              {figma || item.attachments.length > 0 ? (
+                <div className="[&>a]:mt-0 [&>ul]:mt-3">
+                  {figma ? (
+                    <a
+                      href={figma}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex items-center gap-3 rounded-xl border border-line py-2 pr-4 pl-2.5 text-sm hover:bg-sidebar"
+                    >
+                      <span className="grid size-8 place-items-center rounded-lg bg-violet-50 text-[11px] font-bold text-violet-600">
+                        fig
                       </span>
-                    ) : null}
-                  </p>
-                  <p className="mt-0.5 text-amber-800">
-                    <span className="font-medium">How to fix:</span> {d.fix}
-                  </p>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 text-xs text-amber-800">
-              Once it’s fixed in Azure DevOps, this updates at the next sync.
-            </p>
-          </div>
-        ) : null}
-
-        {lateReasons.length > 0 ? (
-          <div className="mt-6">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 className="text-sm font-semibold">
-                Why it&apos;s flagged
-                {item.dismissal ? (
-                  <span className="ml-2 font-normal text-muted-foreground">
-                    · not counted as late
-                  </span>
-                ) : null}
-              </h4>
-              {item.dismissal ? (
-                <button
-                  type="button"
-                  onClick={() => dismiss.mutate(null)}
-                  className="text-[13px] text-muted-foreground hover:text-ink hover:underline"
-                >
-                  Count as late again
-                </button>
-              ) : !dismissing ? (
-                <button
-                  type="button"
-                  onClick={() => setDismissing(true)}
-                  className="inline-flex h-8 items-center rounded-lg border border-line px-3 text-[13px] font-medium hover:bg-sidebar"
-                >
-                  Not really late
-                </button>
+                      <span className="font-medium">Final design in Figma</span>
+                      <ExternalLink aria-hidden className="size-4 text-muted-foreground" />
+                      <span className="sr-only">(opens in a new tab)</span>
+                    </a>
+                  ) : null}
+                  {item.attachments.length > 0 ? (
+                    <ul className="mt-3 flex flex-wrap gap-2" aria-label="Attachments">
+                      {item.attachments.map((f) => (
+                        <li key={f.url}>
+                          <a
+                            href={f.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-sidebar"
+                          >
+                            <Paperclip aria-hidden className="size-3.5 text-muted-foreground" />
+                            <span className="font-medium">{f.name}</span>
+                            {f.sizeBytes !== null ? (
+                              <span className="text-xs text-muted-foreground">
+                                {fileSize(f.sizeBytes)}
+                              </span>
+                            ) : null}
+                            <span className="sr-only">(opens in Azure DevOps)</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
               ) : null}
-            </div>
-            <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {lateReasons.map((r) => (
-                <li key={r.title} className="rounded-xl border border-line px-4 py-3">
-                  <p className="text-sm font-medium">{r.title}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{r.why}</p>
-                </li>
-              ))}
-            </ul>
-            {item.dismissal ? (
-              <p className="mt-3 text-sm text-ink-soft">
-                {item.dismissal.by} marked this as not really late: &ldquo;{item.dismissal.reason}
-                &rdquo;
-              </p>
-            ) : dismissing ? (
-              <form
-                className="mt-3 flex flex-wrap items-center gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (dismissReason.trim().length < 3) return;
-                  dismiss.mutate(dismissReason.trim(), {
-                    onSuccess: () => {
-                      setDismissing(false);
-                      setDismissReason('');
-                    },
-                  });
-                }}
-              >
-                <label htmlFor="dismiss-reason" className="sr-only">
-                  Why it wasn&apos;t really late
-                </label>
-                <input
-                  id="dismiss-reason"
-                  value={dismissReason}
-                  onChange={(e) => setDismissReason(e.target.value)}
-                  maxLength={500}
-                  placeholder="Planned to run into the next sprint"
-                  className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-card px-3 text-sm"
-                />
-                <button
-                  type="submit"
-                  disabled={dismissReason.trim().length < 3 || dismiss.isPending}
-                  className="h-9 rounded-lg bg-ink px-3 text-[13px] font-medium text-white disabled:opacity-50"
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDismissing(false)}
-                  className="h-9 rounded-lg px-3 text-[13px] text-muted-foreground hover:text-ink"
-                >
-                  Cancel
-                </button>
-              </form>
-            ) : null}
-          </div>
-        ) : null}
-
-        {hasHistory ? (
-          <div className="mt-8">
-            <h4 className="text-sm font-semibold">Where the time went</h4>
-            <div className="mt-3">
-              <StateTimeline segments={item.stateTimeline} />
-            </div>
-            <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-              {item.timeInState.map((t) => (
-                <li key={t.state} className="inline-flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className={clsx('size-2 rounded-full', STATE_CATEGORY_BG[t.category])}
-                  />
-                  <span className="text-muted-foreground">{t.state}</span>
-                  <span className="font-medium tabular-nums">{plainHours(t.hours)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        <div className="mt-8">
-          <h4 className="text-sm font-semibold">What changed while working</h4>
-          {changes.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">None.</p>
-          ) : (
-            <ol className="mt-3 divide-y divide-line rounded-xl border border-line">
-              {changes.map((e) => (
-                <li key={e.key} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                  <e.icon
-                    aria-hidden
-                    className={clsx(
-                      'size-4 shrink-0',
-                      e.tone === 'warn' ? 'text-amber-600' : 'text-muted-foreground',
-                    )}
-                  />
-                  <span className="min-w-0 flex-1">
-                    {e.who ? <span className="font-medium">{e.who} </span> : null}
-                    <span className="text-ink-soft">{e.what}</span>
+              <section aria-labelledby="wi-desc">
+                <h3 id="wi-desc" className="text-sm font-semibold">
+                  Description
+                </h3>
+                <div className="mt-2 rounded-lg bg-sidebar/60 px-4 py-3 text-sm leading-relaxed text-ink-soft">
+                  {item.description || item.acceptanceCriteria ? (
+                    <div className="space-y-4">
+                      {item.description ? (
+                        <p className="break-words whitespace-pre-wrap">{item.description}</p>
+                      ) : null}
+                      {item.acceptanceCriteria ? (
+                        <div>
+                          <h4 className="mb-1 text-[13px] font-semibold text-ink">
+                            Acceptance criteria
+                          </h4>
+                          <p className="break-words whitespace-pre-wrap">
+                            {item.acceptanceCriteria}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No description in Azure DevOps.</p>
+                  )}
+                </div>
+              </section>
+              <section aria-labelledby="wi-comments">
+                <h3 id="wi-comments" className="text-sm font-semibold">
+                  Comments
+                  <span className="ml-2 font-normal text-muted-foreground">
+                    {item.comments.length}
                   </span>
-                  <time dateTime={e.at} className="text-xs text-muted-foreground tabular-nums">
-                    {formatDateTime(e.at)}
-                  </time>
-                </li>
-              ))}
-            </ol>
-          )}
+                </h3>
+                <div className="mt-3">
+                  <AzureComments
+                    comments={item.comments}
+                    onIgnore={(commentId, ignored) => ignoreComment.mutate({ commentId, ignored })}
+                  />
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    Only tagged comments count: start a comment with #blocked, #unblocked, #reopen
+                    or #done in Azure DevOps.
+                  </p>
+                </div>
+              </section>
+            </div>
+          </details>
+
+          {item.children.length > 0 ? (
+            <section aria-labelledby="wi-tasks" className="mt-8">
+              <h3 id="wi-tasks" className="text-base font-semibold">
+                Tasks
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  {doneTasks} of {item.children.length} done
+                </span>
+              </h3>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-sidebar" aria-hidden>
+                <div
+                  className="h-full rounded-full bg-emerald-500"
+                  style={{ width: `${(doneTasks / item.children.length) * 100}%` }}
+                />
+              </div>
+              <table className="mt-3 w-full text-sm">
+                <caption className="sr-only">Child tasks</caption>
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground">
+                    <th className="w-12 py-2 font-normal">#</th>
+                    <th className="py-2 font-normal">Task</th>
+                    <th className="hidden py-2 font-normal sm:table-cell">Owner</th>
+                    <th className="py-2 font-normal">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line border-t border-line">
+                  {item.children.map((c, i) => (
+                    <tr key={c.id}>
+                      <td className="py-2.5 text-muted-foreground tabular-nums">{i + 1}</td>
+                      <td className="py-2.5 pr-3">
+                        <Link
+                          to={`${base}/work-items/${c.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {c.title}
+                        </Link>
+                      </td>
+                      <td className="hidden py-2.5 text-ink-soft sm:table-cell">
+                        {c.assignedTo?.displayName ?? 'Unassigned'}
+                      </td>
+                      <td className="py-2.5">
+                        <span
+                          className={clsx(
+                            'rounded-md px-2 py-0.5 text-xs font-medium',
+                            STATE_CATEGORY_PILL[c.stateCategory],
+                          )}
+                        >
+                          {c.state}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          ) : null}
+
+          {showDelay ? (
+            <section
+              id="delay-reason"
+              tabIndex={-1}
+              aria-labelledby="delay-reason-title"
+              className="mt-8 scroll-mt-4 outline-none"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <h4 id="delay-reason-title" className="text-sm font-semibold">
+                  Why it was late
+                </h4>
+                {canAdd && !formOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setFormOpen(true)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line px-3 text-[13px] font-medium hover:bg-sidebar"
+                  >
+                    <Plus aria-hidden className="size-3.5" />
+                    Add reason
+                  </button>
+                ) : null}
+              </div>
+              <div className="mt-3">
+                <DelayReasonHistory reasons={item.delayReasons} />
+              </div>
+              {canAdd && formOpen ? (
+                <div className="mt-4 rounded-2xl bg-sidebar p-5">
+                  <DelayReasonForm projectId={projectId} workItemId={item.id} />
+                </div>
+              ) : null}
+            </section>
+          ) : null}
         </div>
 
-        {showDelay ? (
-          <section
-            id="delay-reason"
-            tabIndex={-1}
-            aria-labelledby="delay-reason-title"
-            className="mt-8 scroll-mt-4 outline-none"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <h4 id="delay-reason-title" className="text-sm font-semibold">
-                Why it was late
-              </h4>
-              {canAdd && !formOpen ? (
-                <button
-                  type="button"
-                  onClick={() => setFormOpen(true)}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line px-3 text-[13px] font-medium hover:bg-sidebar"
-                >
-                  <Plus aria-hidden className="size-3.5" />
-                  Add reason
-                </button>
-              ) : null}
-            </div>
-            <div className="mt-3">
-              <DelayReasonHistory reasons={item.delayReasons} />
-            </div>
-            {canAdd && formOpen ? (
-              <div className="mt-4 rounded-2xl bg-sidebar p-5">
-                <DelayReasonForm projectId={projectId} workItemId={item.id} />
+        <aside aria-label="Time and history" className="space-y-5">
+          {hasHistory ? <TimeInState rows={item.timeInState} /> : null}
+
+          {changes.length > 0 ? (
+            <details className="group rounded-xl border border-line bg-card">
+              <summary className="flex cursor-pointer list-none items-start gap-2 p-5 select-none [&::-webkit-details-marker]:hidden">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-medium text-muted-foreground">
+                    Last change
+                  </span>
+                  <span className="mt-1.5 block text-[15px] text-ink">
+                    {changes.at(-1)!.who ? (
+                      <span className="font-semibold">{changes.at(-1)!.who} </span>
+                    ) : null}
+                    {changes.at(-1)!.what}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {formatDateTime(changes.at(-1)!.at)} · {changes.length} changes in all
+                  </span>
+                </span>
+                <ChevronRight
+                  aria-hidden
+                  className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
+                />
+              </summary>
+              <div className="border-t border-line px-5 py-4">
+                <ol>
+                  {changes.map((e, i) => (
+                    <li key={e.key} className="relative flex gap-3 pb-4 last:pb-0">
+                      {i < changes.length - 1 ? (
+                        <span
+                          aria-hidden
+                          className="absolute top-7 bottom-1 left-[13px] w-px bg-line"
+                        />
+                      ) : null}
+                      <span
+                        className={clsx(
+                          'grid size-7 shrink-0 place-items-center rounded-full',
+                          e.tone === 'warn'
+                            ? 'bg-amber-50 text-amber-600'
+                            : 'bg-sidebar text-muted-foreground',
+                        )}
+                      >
+                        <e.icon aria-hidden className="size-3.5" />
+                      </span>
+                      <div className="min-w-0 pt-0.5 text-sm">
+                        <p className="text-ink">
+                          {e.who ? <span className="font-medium">{e.who} </span> : null}
+                          <span className="text-ink-soft">{e.what}</span>
+                        </p>
+                        <time
+                          dateTime={e.at}
+                          className="mt-0.5 block text-xs text-muted-foreground tabular-nums"
+                        >
+                          {formatDateTime(e.at)}
+                        </time>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
               </div>
-            ) : null}
-          </section>
-        ) : null}
-      </section>
+            </details>
+          ) : null}
+        </aside>
+      </div>
 
       {hasEstimate(item.estimate) ? (
         <div className="mt-10 border-t border-line pt-2">
@@ -784,15 +761,6 @@ function plainHours(hours: number): string {
   return plainDays(hours / 24);
 }
 
-function Stat({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="rounded-xl border border-line px-4 py-3">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-1 font-medium tabular-nums">{children}</dd>
-    </div>
-  );
-}
-
 const FIGMA_URL = /https:\/\/(?:www\.)?figma\.com\/[^\s)"'<>\]]+/g;
 
 /** Latest Figma link mentioned in the story or its comments (the hand-off is usually last). */
@@ -944,5 +912,34 @@ function DetailSkeleton() {
         <Skeleton className="h-48" />
       </div>
     </div>
+  );
+}
+
+/** One line saying where most of the time went, over one slim bar; no legend to decode. */
+function TimeInState({ rows }: { rows: WorkItemDetail['timeInState'] }) {
+  const total = rows.reduce((sum, r) => sum + r.hours, 0);
+  const top = rows.reduce((a, b) => (b.hours > a.hours ? b : a), rows[0]!);
+  return (
+    <section className="rounded-xl border border-line bg-card p-5">
+      <h4 className="text-xs font-medium text-muted-foreground">Where the time went</h4>
+      <p className="mt-1.5 text-[15px] text-ink">
+        Mostly in <span className="font-semibold">{top.state}</span>:{' '}
+        <span className="font-semibold tabular-nums">{plainHours(top.hours)}</span>
+      </p>
+      <span className="mt-3 flex h-1.5 gap-0.5 overflow-hidden rounded-full">
+        {rows.map((t) => (
+          <span
+            key={t.state}
+            title={`${t.state}: ${plainHours(t.hours)}`}
+            className={clsx(
+              'h-full',
+              STATE_CATEGORY_BG[t.category],
+              t.state !== top.state && 'opacity-40',
+            )}
+            style={{ width: `${Math.max(2, (t.hours / (total || 1)) * 100)}%` }}
+          />
+        ))}
+      </span>
+    </section>
   );
 }

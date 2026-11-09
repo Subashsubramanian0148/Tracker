@@ -641,3 +641,24 @@ export interface ApiHealth {
     trigger: string;
   }[];
 }
+
+// ---------------------------------------------------------------------------
+// AI summary
+// ---------------------------------------------------------------------------
+
+export interface WorkItemAiSummary {
+  /** One or two sentences: where the story stands right now. */
+  status: string;
+  /** What happened, oldest first: received, assigned, started, comments, hand-offs. */
+  timeline: { date: string; event: string }[];
+  /** Who the story is waiting on now, if anyone, and since when. */
+  waitingOn: { party: string; since: string | null; reason: string } | null;
+  /** Whose side any delay sits on, judged from the activity. */
+  delayOwner: 'UX team' | 'Others' | 'None' | 'Unclear';
+  /** Whole days with the next move on UX vs on others, from start to now or hand-over. */
+  split: { ux: number; others: number } | null;
+  /** The next thing that should happen. */
+  nextStep: string;
+  model: string;
+  generatedAt: string;
+}

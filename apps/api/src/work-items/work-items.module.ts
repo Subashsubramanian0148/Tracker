@@ -3,6 +3,7 @@ import { DelayCategoriesController, DelaysController } from '../delays/delays.co
 import { DelaysService } from '../delays/delays.service';
 import { MetricsModule } from '../metrics/metrics.module';
 import { ProjectsController } from '../projects/projects.controller';
+import { SummaryService } from './summary.service';
 import { WorkItemsController } from './work-items.controller';
 import { WorkItemsService } from './work-items.service';
 
@@ -14,6 +15,6 @@ import { WorkItemsService } from './work-items.service';
     DelaysController,
     DelayCategoriesController,
   ],
-  providers: [WorkItemsService, DelaysService],
+  providers: [WorkItemsService, SummaryService, DelaysService],
 })
 export class WorkItemsModule {}

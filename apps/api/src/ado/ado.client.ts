@@ -13,6 +13,7 @@ import {
   commentsResponse,
   type AdoComment,
   iterationNodeResponse,
+  workItemTextResponse,
   iterationsResponse,
   projectsResponse,
   reportingRevisionsResponse,
@@ -295,6 +296,36 @@ export class AdoClient {
     };
     walk(root);
     return out;
+  }
+
+  /** A work item's title, state and text fields (for the AI summary), or null if unreadable. */
+  async getWorkItemText(projectId: string, workItemId: number) {
+    try {
+      const res = await this.get(
+        `${seg(projectId)}/_apis/wit/workitems/${workItemId}`,
+        {
+          fields: [
+            'System.WorkItemType',
+            'System.Title',
+            'System.State',
+            'System.Description',
+            'Microsoft.VSTS.Common.AcceptanceCriteria',
+          ].join(','),
+        },
+        workItemTextResponse,
+      );
+      const f = res.fields;
+      const text = (k: string) => (typeof f[k] === 'string' ? (f[k] as string) : null);
+      return {
+        type: text('System.WorkItemType'),
+        title: text('System.Title'),
+        state: text('System.State'),
+        description: text('System.Description'),
+        acceptanceCriteria: text('Microsoft.VSTS.Common.AcceptanceCriteria'),
+      };
+    } catch {
+      return null;
+    }
   }
 
   /** A work item's Iteration path, or null when it can't be read (e.g. it lives in another project). */

@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   Param,
+  Post,
   Put,
   Query,
   UseGuards,
@@ -15,6 +16,7 @@ import {
   type DismissDelayBody,
   workItemListQuery,
   type Paged,
+  type WorkItemAiSummary,
   type WorkItemDetail,
   type WorkItemListQuery,
   type WorkItemSummary,
@@ -23,12 +25,33 @@ import { CurrentUser } from '../common/decorators';
 import { ProjectAccessGuard } from '../common/guards';
 import type { SessionUser } from '../common/session.types';
 import { ZodPipe } from '../common/zod-validation.pipe';
+import { SummaryService } from './summary.service';
 import { WorkItemsService } from './work-items.service';
 
 @Controller('projects/:projectId/work-items')
 @UseGuards(ProjectAccessGuard)
 export class WorkItemsController {
-  constructor(private readonly items: WorkItemsService) {}
+  constructor(
+    private readonly items: WorkItemsService,
+    private readonly summaries: SummaryService,
+  ) {}
+
+  /** Whether AI summaries are set up, so the page knows to show the button. */
+  @Get('summary-enabled')
+  summaryEnabled(): { enabled: boolean } {
+    return { enabled: this.summaries.enabled };
+  }
+
+  /** AI summary of the story, its tasks and its parent. Only runs when someone asks. */
+  @Post(':id/summary')
+  @HttpCode(200)
+  summary(
+    @Param('projectId') projectId: string,
+    @Param('id', new ZodPipe(workItemId)) id: number,
+    @CurrentUser() user: SessionUser,
+  ): Promise<WorkItemAiSummary> {
+    return this.summaries.summarise(projectId, id, user);
+  }
 
   @Get()
   list(

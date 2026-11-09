@@ -165,13 +165,9 @@ export function StoryCard({ item, projectId, now }: StoryCardProps) {
             </span>
             <span className="flex items-center gap-1.5 text-ink">
               {progress ? (
-                <>
-                  <span aria-hidden className={clsx('size-2 rounded-full', progress.color)} />
-                  {progress.label}{' '}
-                  <span className="text-muted-foreground tabular-nums">
-                    · step {progress.step} of {progress.steps}
-                  </span>
-                </>
+                <span className="text-muted-foreground tabular-nums">
+                  Step {progress.step} of {progress.steps}
+                </span>
               ) : (
                 item.state
               )}

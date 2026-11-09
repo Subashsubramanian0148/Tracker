@@ -2,6 +2,7 @@ import type {
   CreateDelayReasonBody,
   DelayReason,
   Paged,
+  WorkItemAiSummary,
   WorkItemDetail,
   WorkItemSummary,
 } from '@ado-metrics/shared';
@@ -108,5 +109,30 @@ export function useCreateDelayReason(projectId: string, workItemId: number) {
         qc.invalidateQueries({ queryKey: qk.projects }),
       ]);
     },
+  });
+}
+
+/** Whether AI summaries are set up on the server (a Groq key is configured). */
+export function useSummaryEnabled(projectId: string) {
+  return useQuery({
+    queryKey: ['summary-enabled', projectId],
+    queryFn: ({ signal }) =>
+      api.get<{ enabled: boolean }>(
+        `/projects/${seg(projectId)}/work-items/summary-enabled`,
+        undefined,
+        signal,
+      ),
+    staleTime: Infinity,
+  });
+}
+
+/** Asks for an AI summary of the story, its tasks and its parent. */
+export function useAiSummary(projectId: string, workItemId: number) {
+  return useMutation({
+    mutationFn: () =>
+      api.post<WorkItemAiSummary>(
+        `/projects/${seg(projectId)}/work-items/${seg(workItemId)}/summary`,
+        {},
+      ),
   });
 }

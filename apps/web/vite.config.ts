@@ -9,6 +9,8 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // Let an ngrok tunnel reach the dev server for sharing.
+    allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app'],
     proxy: {
       // Keep the Host header so the session cookie set by the API stays first-party.
       '/api': { target: 'http://127.0.0.1:3000', changeOrigin: false },

@@ -19,6 +19,7 @@ import { round } from '../metrics/engine/stats';
 import { PrismaService } from '../prisma/prisma.service';
 import { toDelayReason, toSummary, type WorkItemRow } from './mappers';
 import { SPRINT_SEPARATOR } from './mappers';
+import { BACKLOG_TYPES } from '../metrics/engine/delays';
 
 const SORT_FIELD = {
   changedDate: 'changedDate',
@@ -61,7 +62,8 @@ export class WorkItemsService {
         q.stateCategory
           ? { stateCategory: q.stateCategory }
           : { stateCategory: { not: 'Removed' } },
-        q.type ? { type: q.type } : {},
+        // Like the Azure DevOps board: backlog items only, not their Tasks or parent Features.
+        q.type ? { type: q.type } : { type: { in: [...BACKLOG_TYPES] } },
         q.iterationPath
           ? {
               OR: [

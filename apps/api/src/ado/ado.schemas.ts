@@ -118,6 +118,10 @@ export const iterationNodeResponse: z.ZodType<IterationNode> = z.lazy(() =>
   }),
 );
 
+export const workItemTextResponse = z.object({
+  fields: z.record(z.string(), z.unknown()),
+});
+
 export const workItemIterationResponse = z.object({
   fields: z.object({ 'System.IterationPath': z.string().optional() }).partial(),
 });

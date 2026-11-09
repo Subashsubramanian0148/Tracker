@@ -5,15 +5,13 @@ import {
   ArrowRight,
   CircleCheck,
   Columns3,
-  FolderKanban,
   LayoutDashboard,
-  Layers,
   Rocket,
   TriangleAlert,
-  type LucideIcon,
 } from 'lucide-react';
 import { Link } from 'react-router';
 import { useProjects } from '../../api/projects';
+import { DashboardArt } from './DashboardArt';
 import { NoProjects } from '../../app/RootRedirect';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -47,8 +45,6 @@ export function DashboardPage() {
   const first = me.user.displayName.split(/\s+/)[0] ?? me.user.displayName;
   const left = welcomeLeft();
   const list = projects.data ?? [];
-  const items = list.reduce((n, p) => n + p.workItemCount, 0);
-  const delays = list.reduce((n, p) => n + p.openDelayCount, 0);
   const today = new Date(now).toLocaleDateString(undefined, {
     weekday: 'long',
     day: 'numeric',
@@ -62,111 +58,69 @@ export function DashboardPage() {
         className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-brand-soft/50 via-brand-soft/15 to-transparent"
       />
 
-      <div className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center gap-8 px-4 py-10 sm:px-8">
-        <header>
-          <p className="text-sm text-ink-soft">{today}</p>
-          <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink sm:text-[34px]">
-            {greeting(now)}, {first}
-          </h1>
-          <p className="mt-2 text-sm text-ink-soft">Here's where your teams stand right now.</p>
-        </header>
+      <div className="relative mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-4 py-10 sm:px-8 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="flex flex-col gap-8">
+          <header>
+            <p className="text-sm text-ink-soft">{today}</p>
+            <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink sm:text-[34px]">
+              {greeting(now)}, {first}
+            </h1>
+            <p className="mt-2 text-sm text-ink-soft">Here's where your teams stand right now.</p>
+          </header>
 
-        {projects.isError ? (
-          <ErrorState error={projects.error} onRetry={() => void projects.refetch()} />
-        ) : projects.isPending ? (
-          <div className="grid gap-4 sm:grid-cols-3" role="status">
-            <span className="sr-only">Loading projects…</span>
-            <Skeleton className="h-24" />
-            <Skeleton className="h-24" />
-            <Skeleton className="h-24" />
-          </div>
-        ) : list.length === 0 ? (
-          <NoProjects />
-        ) : (
-          <>
-            <section aria-label="Totals" className="grid gap-4 sm:grid-cols-3">
-              <Total icon={FolderKanban} label="Projects" value={list.length} />
-              <Total icon={Layers} label="Stories tracked" value={items} />
-              <Total
-                icon={TriangleAlert}
-                label="Late right now"
-                value={delays}
-                alert={delays > 0}
-              />
-            </section>
-
-            {left > 0 ? (
-              <Link
-                to="/welcome"
-                className="group flex items-center gap-4 rounded-2xl border border-line bg-surface p-4 shadow-soft transition-colors hover:bg-sidebar"
-              >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-primary">
-                  <Rocket aria-hidden className="size-5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-ink">Finish getting started</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {left} of {WELCOME_STEPS} steps left
+          {projects.isError ? (
+            <ErrorState error={projects.error} onRetry={() => void projects.refetch()} />
+          ) : projects.isPending ? (
+            <div className="grid gap-4 sm:grid-cols-3" role="status">
+              <span className="sr-only">Loading projects…</span>
+              <Skeleton className="h-24" />
+              <Skeleton className="h-24" />
+              <Skeleton className="h-24" />
+            </div>
+          ) : list.length === 0 ? (
+            <NoProjects />
+          ) : (
+            <>
+              {left > 0 ? (
+                <Link
+                  to="/welcome"
+                  className="group flex items-center gap-4 rounded-2xl border border-line bg-surface p-4 shadow-soft transition-colors hover:bg-sidebar"
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-primary">
+                    <Rocket aria-hidden className="size-5" />
                   </span>
-                </span>
-                <ArrowRight
-                  aria-hidden
-                  className="size-4 text-faint transition-transform group-hover:translate-x-0.5"
-                />
-              </Link>
-            ) : null}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-ink">
+                      Finish getting started
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {left} of {WELCOME_STEPS} steps left
+                    </span>
+                  </span>
+                  <ArrowRight
+                    aria-hidden
+                    className="size-4 text-faint transition-transform group-hover:translate-x-0.5"
+                  />
+                </Link>
+              ) : null}
 
-            <section aria-labelledby="projects-title">
-              <h2 id="projects-title" className="mb-3 text-lg font-semibold">
-                Your projects
-              </h2>
-              <ul className="grid gap-4 md:grid-cols-2">
-                {list.map((p) => (
-                  <li key={p.id}>
-                    <ProjectCard project={p} now={now} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Total({
-  icon: Icon,
-  label,
-  value,
-  alert,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: number;
-  alert?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-4 rounded-2xl border border-line bg-surface p-5 shadow-soft">
-      <span
-        className={clsx(
-          'flex size-11 shrink-0 items-center justify-center rounded-xl',
-          alert ? 'bg-brand-soft text-primary' : 'bg-sidebar text-ink-soft',
-        )}
-      >
-        <Icon aria-hidden className="size-5" />
-      </span>
-      <span>
-        <span className="block text-xs text-muted-foreground">{label}</span>
-        <span
-          className={clsx(
-            'block font-display text-2xl font-semibold tabular-nums',
-            alert ? 'text-primary' : 'text-ink',
+              <section aria-labelledby="projects-title">
+                <h2 id="projects-title" className="mb-3 text-lg font-semibold">
+                  Your projects
+                </h2>
+                <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+                  {list.map((p) => (
+                    <li key={p.id}>
+                      <ProjectCard project={p} now={now} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </>
           )}
-        >
-          {formatNumber(value)}
-        </span>
-      </span>
+        </div>
+        <DashboardArt className="hidden w-full translate-x-12 self-start justify-self-end xl:block" />
+      </div>
     </div>
   );
 }
